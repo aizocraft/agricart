@@ -1,6 +1,7 @@
 # **AgriCart - Multi-Vendor Agricultural E-Commerce Platform**  
 
-![AgriCart Logo](https://via.placeholder.com/150x50?text=AgriCart)  
+![AgriCart Logo](pictures/logo-agricart.png)
+
 
 🚀 **Backend is Complete – Frontend development in progress!** 🌱 *(Under Construction)*  
 
