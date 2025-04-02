@@ -1,9 +1,53 @@
+
+
 # **AgriCart - Multi-Vendor Agricultural E-Commerce Platform**  
 
 ![AgriCart Logo](pictures/logo-agricart.png)
 
 
 🚀 **Backend is Complete – Frontend development in progress!** 🌱 *(Under Construction)*  
+## 🔥 **Project Stats**  
+
+<table>
+  <tr>
+    <td><b>🚀 Total Commits</b></td>
+    <td><img src="https://img.shields.io/github/commit-activity/m/aizocraft/agricart?style=flat-square"></td>
+  </tr>
+  <tr>
+    <td><b>⭐ GitHub Stars</b></td>
+    <td><img src="https://img.shields.io/github/stars/aizocraft/agricart?style=flat-square"></td>
+  </tr>
+  <tr>
+    <td><b>🔄 Forks</b></td>
+    <td><img src="https://img.shields.io/github/forks/aizocraft/agricart?style=flat-square"></td>
+  </tr>
+</table>
+
+---
+
+![GitHub License](https://img.shields.io/github/license/aizocraft/agricart?style=for-the-badge)
+![GitHub Repo Size](https://img.shields.io/github/repo-size/aizocraft/agricart?color=green&style=for-the-badge)
+![GitHub Last Commit](https://img.shields.io/github/last-commit/aizocraft/agricart?style=for-the-badge)
+![GitHub Commit Activity](https://img.shields.io/github/commit-activity/m/aizocraft/agricart?color=blue&style=for-the-badge)
+![GitHub Issues](https://img.shields.io/github/issues/aizocraft/agricart?color=yellow&style=for-the-badge)
+![GitHub Pull Requests](https://img.shields.io/github/issues-pr/aizocraft/agricart?color=purple&style=for-the-badge)
+
+<br>
+
+![Typing SVG](https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=600&size=24&pause=1000&color=00FF00&center=true&vCenter=true&width=600&lines=🚧+Development+In+Progress...;Stay+Tuned!+💻)
+
+<br>
+
+## 🚀 **Under Construction...** 🚀  
+### **🛠️ Expected Completion Date: 📅 End of This Week**  
+
+### **Progress:**  
+![Progress](https://progress-bar.dev/50/?title=Development%20Progress&width=400)  
+
+<br>
+
+
+
 
 ---
 
@@ -15,11 +59,9 @@
 5. [Project Structure](#project-structure)  
 6. [Installation Guide](#installation-guide)  
 7. [Configuration](#configuration)  
-8. [Dependencies](#dependencies)  
-9. [Testing](#testing)  
-10. [Deployment](#deployment)  
-11. [Contributing](#contributing)  
-12. [License](#license)  
+8. [Deployment](#deployment)  
+9.  [Contributing](#contributing)  
+10. [License](#license)  
 
 ---
 
@@ -110,7 +152,7 @@ Authorization: Bearer <JWT_TOKEN>
 | PUT | `/orders/:id/pay` | Mark as paid | Buyer |  
 | PUT | `/orders/:id/deliver` | Mark as delivered | Farmer/Admin |  
 
-*(Full API documentation available in `/documentation/api-spec.yaml`)*  
+*(Full API documentation to be provided ..)*  
 
 ---
 
@@ -139,7 +181,6 @@ frontend/
 └── src/
     ├── assets/       # Images, fonts  
     ├── components/   # Reusable UI  
-    ├── features/     # Redux slices  
     ├── pages/        # Route components  
     ├── store/        # Redux configuration  
     ├── App.jsx       # Main component  
@@ -168,8 +209,8 @@ frontend/
    ```  
 3️⃣ Install frontend dependencies *(🚧 Under Construction 🚧)*:  
    ```bash
-   cd ../frontend
-   yarn install
+   cd frontend
+   npm install
    ```  
 4️⃣ Set up environment variables (`.env` files in both folders)  
 
@@ -196,45 +237,7 @@ VITE_SOCKET_URL=http://localhost:5000
 
 ---
 
-## **Dependencies**  
 
-### **Backend**  
-```json
-"dependencies": {
-  "express": "^4.18.2",
-  "mongoose": "^7.0.3",
-  "bcryptjs": "^2.4.3",
-  "jsonwebtoken": "^9.0.0",
-  "cloudinary": "^1.37.0",
-  "socket.io": "^4.6.1",
-  "nodemailer": "^6.9.1"
-}
-```
-
-### **Frontend (🚧 Under Construction 🚧)**  
-```json
-"dependencies": {
-  "react": "^18.2.0",
-  "react-router-dom": "^6.10.0",
-  "redux": "^4.2.1",
-  "axios": "^1.3.5",
-  "socket.io-client": "^4.6.1",
-  "tailwindcss": "^3.3.0"
-}
-```
-
----
-
-## **Testing**  
-```bash
-# Backend tests  
-cd backend  
-npm run test  
-```  
-
-🚧 **Frontend testing not yet implemented**  
-
----
 
 ## **Deployment**  
 
@@ -251,8 +254,26 @@ npm run test
 
 ---
 
+
+
+![Open Source Badge](https://forthebadge.com/images/badges/open-source.svg)  
+![Built with Love Badge](https://forthebadge.com/images/badges/built-with-love.svg)  
+
+---
+
 ## **License**  
 📜 Distributed under the **MIT License**  
+
+---
+
+
+---
+
+## 📌 **Stay Connected!**  
+
+🔗 [Website](https://yourwebsite.com)  
+🐦 [Twitter](https://twitter.com/yourusername)  
+💻 [GitHub](https://github.com/yourusername)  
 
 ---
 

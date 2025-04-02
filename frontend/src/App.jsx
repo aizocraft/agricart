@@ -1,39 +1,76 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
-import Login from './pages/Login';
-import Register from './pages/Register';
 import Products from './pages/Products';
-import ProductDetail from './pages/ProductDetail';
+import Cart from './pages/Cart';
+import Orders from './pages/Orders';
+import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
 import Navbar from './components/Navbar';
-
-// Add this import
+import Footer from './components/Footer';
+import OrderDetails from './pages/OrderDetails';
+import ProductDetails from './pages/ProductDetails';
+import FarmerDashboard from './pages/farmer/Dashboard';
+import AdminDashboard from './pages/admin/Dashboard';
+import ProductForm from './pages/farmer/ProductForm';
 import ProtectedRoute from './components/ProtectedRoute';
-import FarmerDashboard from './pages/FarmerDashboard';
+import NotFound from './pages/NotFound';
+import { Toaster } from 'react-hot-toast';
 
 function App() {
   return (
-    <BrowserRouter>
+    <div className="flex flex-col min-h-screen">
       <Navbar />
-      <main className="container mx-auto px-4 py-8">
+      <main className="flex-grow">
+        <Toaster position="top-center" />
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/products/:id" element={<ProductDetails />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route path="/orders" element={<Orders />} />
+          <Route path="/orders/:id" element={<OrderDetails />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/products/:id" element={<ProductDetail />} />
           
-          {/* Example protected route */}
           <Route 
-            path="/farmer-dashboard" 
+            path="/farmer/dashboard" 
             element={
               <ProtectedRoute roles={['farmer']}>
                 <FarmerDashboard />
               </ProtectedRoute>
             } 
           />
+          <Route 
+            path="/farmer/products/new" 
+            element={
+              <ProtectedRoute roles={['farmer']}>
+                <ProductForm />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/farmer/products/:id/edit" 
+            element={
+              <ProtectedRoute roles={['farmer']}>
+                <ProductForm />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/admin/dashboard" 
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
-    </BrowserRouter>
+      <Footer />
+    </div>
   );
 }
 

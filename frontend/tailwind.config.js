@@ -1,3 +1,7 @@
+// tailwind.config.js
+import forms from '@tailwindcss/forms';
+import typography from '@tailwindcss/typography';
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -7,11 +11,16 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#4CAF50',
-        secondary: '#2E7D32',
-        accent: '#8BC34A',
+        primary: {
+          DEFAULT: '#16a34a',
+          light: '#22c55e',
+          dark: '#15803d',
+        },
       },
     },
   },
-  plugins: [],
+  plugins: [
+    forms,
+    typography,
+  ],
 }

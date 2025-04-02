@@ -1,3 +1,38 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --primary: #16a34a;
+  --primary-light: #22c55e;
+  --primary-dark: #15803d;
+}
+
+body {
+  @apply bg-gray-50 text-gray-900;
+}
+
+a {
+  @apply text-primary hover:text-primary-dark transition-colors;
+}
+
+.btn-primary {
+  @apply bg-primary text-white px-4 py-2 rounded hover:bg-primary-dark transition-colors;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  @apply w-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-primary rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary-dark;
+}

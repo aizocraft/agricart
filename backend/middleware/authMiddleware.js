@@ -20,6 +20,7 @@ export const protect = async (req, res, next) => {
   }
 };
 
+// Farmer-only access
 export const farmerOnly = (req, res, next) => {
   if (req.user.role !== 'farmer') {
     return res.status(403).json({ message: 'Farmer access only' });
@@ -27,7 +28,7 @@ export const farmerOnly = (req, res, next) => {
   next();
 };
 
-// 🔥 ADD THIS FUNCTION FOR ADMIN-ONLY ACCESS
+// Admin-only access
 export const adminOnly = (req, res, next) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ message: 'Admin access only' });

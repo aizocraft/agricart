@@ -12,18 +12,18 @@ import { protect, adminOnly, farmerOnly } from '../middleware/authMiddleware.js'
 const router = express.Router();
 
 router.route('/')
-  .post(protect, createOrder) // Buyer creates order
-  .get(protect, adminOnly, getOrders); // Admin gets all orders
+  .post(protect, createOrder)
+  .get(protect, adminOnly, getOrders);
 
-router.route('/myorders').get(protect, getUserOrders); // Buyer gets their orders
+router.route('/myorders').get(protect, getUserOrders);
 
 router.route('/:id')
-  .get(protect, getOrderById); // Get order details
+  .get(protect, getOrderById);
 
 router.route('/:id/pay')
-  .put(protect, updateOrderToPaid); // Update order to paid
+  .put(protect, updateOrderToPaid);
 
 router.route('/:id/deliver')
-  .put(protect, farmerOnly, updateOrderToDelivered); // Farmer marks as delivered
+  .put(protect, farmerOnly, updateOrderToDelivered);
 
 export default router;
