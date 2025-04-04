@@ -1,25 +1,28 @@
 import express from 'express';
 import { 
-  createProduct, 
-  getProducts, 
-  getProductById,  // ✅ Added this
-  searchProducts,   // ✅ Added this
-  getFarmerProducts,
-  deleteProduct 
+  createProduct,
+  getProducts,
+  getProductById,
+  updateProduct,
+  deleteProduct,
+  getProductsByCategory,
+  getFarmerProducts
 } from '../controllers/productController.js';
 import { protect, farmerOnly } from '../middleware/authMiddleware.js';
+import upload from '../utils/uploadMiddleware.js';
 
 const router = express.Router();
 
 router.route('/')
   .get(getProducts)
-  .post(protect, farmerOnly, createProduct);
+  .post(protect, farmerOnly, upload.array('images', 5), createProduct);
 
 router.route('/:id')
-  .get(getProductById);
+  .get(getProductById)
+  .put(protect, farmerOnly, upload.array('images', 5), updateProduct)
+  .delete(protect, farmerOnly, deleteProduct);
 
-router.get('/search', searchProducts);
-router.get('/myproducts', protect, farmerOnly, getFarmerProducts);
-router.delete('/:id', protect, farmerOnly, deleteProduct);
+router.get('/category/:category', getProductsByCategory);
+router.get('/farmer/:id', getFarmerProducts);
 
 export default router;

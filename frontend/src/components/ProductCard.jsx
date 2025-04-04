@@ -1,46 +1,36 @@
-import { Link } from 'react-router-dom'
-import { useDispatch } from 'react-redux'
-import { addToCart } from '../store/cartSlice'
-import { toast } from 'react-hot-toast'
+import { Link } from 'react-router-dom';
+import StarRating from './StarRating';
 
-export default function ProductCard({ product }) {
-  const dispatch = useDispatch()
-
-  const handleAddToCart = () => {
-    dispatch(addToCart({
-      product: product._id,
-      name: product.name,
-      price: product.price,
-      image: product.image,
-      quantity: 1
-    }))
-    toast.success('Added to cart!')
-  }
-
+const ProductCard = ({ product, className = '' }) => {
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition">
+    <div className={`bg-white rounded-lg shadow-md overflow-hidden transition-transform hover:scale-105 ${className}`}>
       <Link to={`/products/${product._id}`}>
-        <img 
-          src={product.image} 
-          alt={product.name} 
-          className="w-full h-48 object-cover"
-        />
-      </Link>
-      <div className="p-4">
-        <Link to={`/products/${product._id}`}>
-          <h3 className="font-semibold text-lg mb-1 hover:text-primary">{product.name}</h3>
-        </Link>
-        <p className="text-gray-600 text-sm mb-2 line-clamp-2">{product.description}</p>
-        <div className="flex justify-between items-center mt-4">
-          <span className="font-bold text-primary">${product.price}</span>
-          <button 
-            onClick={handleAddToCart}
-            className="bg-primary text-white px-3 py-1 rounded hover:bg-green-600 transition"
-          >
-            Add to Cart
-          </button>
+        <div className="aspect-square bg-gray-100">
+          <img 
+            src={product.images[0]} 
+            alt={product.name}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
         </div>
-      </div>
+        <div className="p-4">
+          <h3 className="font-medium text-gray-900 truncate">{product.name}</h3>
+          <div className="mt-1 flex items-center">
+            <StarRating rating={product.rating} />
+            <span className="ml-1 text-sm text-gray-600">({product.numReviews})</span>
+          </div>
+          <p className="mt-2 text-lg font-semibold text-green-600">
+            ${product.price.toFixed(2)}
+          </p>
+          {product.organic && (
+            <span className="inline-block mt-2 bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full uppercase font-semibold tracking-wide">
+              Organic
+            </span>
+          )}
+        </div>
+      </Link>
     </div>
-  )
-}
+  );
+};
+
+export default ProductCard;
