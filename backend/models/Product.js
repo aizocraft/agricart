@@ -3,8 +3,9 @@ import mongoose from 'mongoose';
 const productSchema = new mongoose.Schema({
   name: { 
     type: String, 
-    required: true,
-    trim: true
+    required: [true, 'Product name is required'],
+    trim: true,
+    maxlength: [100, 'Name cannot exceed 100 characters']
   },
   description: { 
     type: String,
@@ -12,41 +13,51 @@ const productSchema = new mongoose.Schema({
   },
   price: { 
     type: Number, 
+    required: [true, 'Price is required'],
+    min: [0, 'Price must be positive'],
+    set: v => parseFloat(v.toFixed(2)) // Ensure 2 decimal places
+  },
+  unit: {
+    type: String,
     required: true,
-    min: [0, 'Price must be positive']
+    enum: {
+      values: ['kg', 'g', 'litre', 'ml', 'piece', 'dozen', 'packet'],
+      message: '{VALUE} is not a valid unit'
+    },
+    default: 'kg'
   },
   category: {
     type: String,
-    required: true,
-    enum: [
-      'Fruits', 
-      'Vegetables', 
-      'Dairy', 
-      'Grains', 
-      'Meat', 
-      'Poultry',
-      'Seafood',
-      'Herbs',
-      'Spices',
-      'Other'
-    ]
+    required: [true, 'Category is required'],
+    enum: {
+      values: [
+        'Fruits', 'Vegetables', 'Dairy', 'Grains', 
+        'Meat', 'Poultry', 'Seafood', 'Herbs', 'Spices', 'Other'
+      ],
+      message: '{VALUE} is not a valid category'
+    }
   },
   subCategory: {
     type: String,
-    required: function() {
-      return this.category === 'Fruits' || 
-             this.category === 'Vegetables' ||
-             this.category === 'Dairy';
+    required: [
+      function() {
+        return ['Fruits', 'Vegetables', 'Dairy'].includes(this.category);
+      },
+      'Subcategory is required for this category'
+    ]
+  },
+  images: {
+    type: [String],
+    required: [true, 'At least one product image is required'],
+    validate: {
+      validator: v => Array.isArray(v) && v.length > 0,
+      message: 'At least one product image is required'
     }
   },
-  images: [{
-    type: String,
-    required: [true, 'At least one image is required']
-  }],
   farmer: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User', 
-    required: true 
+    required: [true, 'Farmer reference is required'] 
   },
   stock: { 
     type: Number, 
@@ -55,47 +66,43 @@ const productSchema = new mongoose.Schema({
   },
   location: {
     type: String,
-    required: true
+    required: [true, 'Location is required']
   },
   harvestDate: {
-    type: Date
+    type: Date,
+    validate: {
+      validator: function(v) {
+        return !v || v <= new Date();
+      },
+      message: 'Harvest date cannot be in the future'
+    }
   },
   organic: {
     type: Boolean,
     default: false
-  },
-  rating: {
-    type: Number,
-    default: 0,
-    min: 0,
-    max: 5
-  },
-  numReviews: {
-    type: Number,
-    default: 0
   }
 }, { 
   timestamps: true,
-  toObject: { virtuals: true },
-  toJSON: { virtuals: true }
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
-// Automatically populate farmer details when querying
-productSchema.pre(/^find/, function(next) {
-  this.populate({
-    path: 'farmer',
-    select: 'name avatar location farmName rating'
-  });
-  next();
-});
-
-// Set location from farmer's location before saving
+// Set location from farmer before saving
 productSchema.pre('save', async function(next) {
-  if (!this.isModified('location')) {
+  if (!this.isModified('location') || !this.location) {
     const farmer = await mongoose.model('User').findById(this.farmer);
-    this.location = farmer.location;
+    if (farmer) {
+      this.location = farmer.location;
+    }
   }
   next();
+});
+
+// Add virtual population
+productSchema.virtual('reviews', {
+  ref: 'Review',
+  localField: '_id',
+  foreignField: 'product'
 });
 
 export default mongoose.model('Product', productSchema);

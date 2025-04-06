@@ -1,37 +1,22 @@
 import Product from '../models/Product.js';
-import { v2 as cloudinary } from 'cloudinary';
 import mongoose from 'mongoose';
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
-
-// Helper function to upload images
-const uploadImages = async (imageFiles) => {
-  const uploadPromises = imageFiles.map(async (image) => {
-    const result = await cloudinary.uploader.upload(image, {
-      folder: 'agriCart/products',
-      crop: 'scale'
-    });
-    return result.secure_url;
-  });
-  return Promise.all(uploadPromises);
-};
-
-// @desc    Create new product
-// @route   POST /api/products
-// @access  Private/Farmer
 export const createProduct = async (req, res) => {
   try {
-    const { name, price, description, category, subCategory, stock, organic } = req.body;
-    let images = [];
+    const { 
+      name, 
+      price, 
+      unit, 
+      description, 
+      category, 
+      subCategory, 
+      stock, 
+      organic,
+      harvestDate 
+    } = req.body;
 
-    if (req.files && req.files.length > 0) {
-      images = await uploadImages(req.files.map(file => file.path));
-    }
+    // Get image URLs from middleware
+    const images = req.files?.map(file => file.url) || [];
 
     const farmer = await mongoose.model('User').findById(req.user.id);
     if (!farmer) {
@@ -40,22 +25,23 @@ export const createProduct = async (req, res) => {
 
     const product = await Product.create({
       name,
-      price,
+      price: parseFloat(price),
+      unit,
       description,
       category,
       subCategory,
       images,
       farmer: req.user.id,
-      stock,
+      stock: parseInt(stock),
       location: farmer.location,
-      organic
+      organic: organic === 'true' || organic === true,
+      harvestDate: harvestDate || undefined
     });
 
     res.status(201).json({
       success: true,
       product
     });
-
   } catch (error) {
     console.error('Product creation error:', error);
     res.status(500).json({ 
@@ -66,23 +52,17 @@ export const createProduct = async (req, res) => {
   }
 };
 
-// @desc    Get all products with filtering
-// @route   GET /api/products
-// @access  Public
 export const getProducts = async (req, res) => {
   try {
-    // Filtering
     const queryObj = { ...req.query };
     const excludedFields = ['page', 'sort', 'limit', 'fields', 'search'];
     excludedFields.forEach(el => delete queryObj[el]);
 
-    // Advanced filtering
     let queryStr = JSON.stringify(queryObj);
     queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, match => `$${match}`);
     
     let query = Product.find(JSON.parse(queryStr));
 
-    // Search
     if (req.query.search) {
       query = query.find({
         $or: [
@@ -92,7 +72,6 @@ export const getProducts = async (req, res) => {
       });
     }
 
-    // Sorting
     if (req.query.sort) {
       const sortBy = req.query.sort.split(',').join(' ');
       query = query.sort(sortBy);
@@ -100,7 +79,6 @@ export const getProducts = async (req, res) => {
       query = query.sort('-createdAt');
     }
 
-    // Pagination
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
@@ -118,7 +96,6 @@ export const getProducts = async (req, res) => {
       pages: Math.ceil(total / limit),
       products
     });
-
   } catch (error) {
     res.status(500).json({ 
       success: false,
@@ -128,12 +105,9 @@ export const getProducts = async (req, res) => {
   }
 };
 
-// @desc    Get single product
-// @route   GET /api/products/:id
-// @access  Public
 export const getProductById = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findById(req.params.id).populate('farmer', 'name email');
     
     if (!product) {
       return res.status(404).json({ 
@@ -146,7 +120,6 @@ export const getProductById = async (req, res) => {
       success: true,
       product
     });
-
   } catch (error) {
     res.status(500).json({ 
       success: false,
@@ -156,9 +129,6 @@ export const getProductById = async (req, res) => {
   }
 };
 
-// @desc    Update product
-// @route   PUT /api/products/:id
-// @access  Private/Farmer
 export const updateProduct = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -170,7 +140,6 @@ export const updateProduct = async (req, res) => {
       });
     }
 
-    // Verify ownership
     if (product.farmer.toString() !== req.user.id) {
       return res.status(403).json({ 
         success: false,
@@ -178,25 +147,18 @@ export const updateProduct = async (req, res) => {
       });
     }
 
-    // Handle image updates
-    let images = product.images;
-    if (req.files && req.files.length > 0) {
-      // Delete old images from Cloudinary
-      const deletePromises = product.images.map(async (image) => {
-        const publicId = image.split('/').pop().split('.')[0];
-        await cloudinary.uploader.destroy(`agriCart/products/${publicId}`);
-      });
-      await Promise.all(deletePromises);
-      
-      // Upload new images
-      images = await uploadImages(req.files.map(file => file.path));
-    }
+    // Get new image URLs from middleware
+    const newImages = req.files?.map(file => file.url) || [];
+    const images = [...product.images, ...newImages];
 
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id,
       {
         ...req.body,
-        images
+        images,
+        price: parseFloat(req.body.price),
+        stock: parseInt(req.body.stock),
+        organic: req.body.organic === 'true' || req.body.organic === true
       },
       { new: true, runValidators: true }
     );
@@ -205,7 +167,6 @@ export const updateProduct = async (req, res) => {
       success: true,
       product: updatedProduct
     });
-
   } catch (error) {
     res.status(500).json({ 
       success: false,
@@ -215,9 +176,6 @@ export const updateProduct = async (req, res) => {
   }
 };
 
-// @desc    Delete product
-// @route   DELETE /api/products/:id
-// @access  Private/Farmer
 export const deleteProduct = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -229,7 +187,6 @@ export const deleteProduct = async (req, res) => {
       });
     }
 
-    // Verify ownership
     if (product.farmer.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ 
         success: false,
@@ -250,7 +207,6 @@ export const deleteProduct = async (req, res) => {
       success: true,
       message: 'Product deleted successfully'
     });
-
   } catch (error) {
     res.status(500).json({ 
       success: false,
@@ -260,21 +216,17 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
-// @desc    Get products by category
-// @route   GET /api/products/category/:category
-// @access  Public
 export const getProductsByCategory = async (req, res) => {
   try {
     const products = await Product.find({ 
       category: req.params.category 
-    });
+    }).populate('farmer', 'name');
 
     res.json({
       success: true,
       count: products.length,
       products
     });
-
   } catch (error) {
     res.status(500).json({ 
       success: false,
@@ -284,9 +236,6 @@ export const getProductsByCategory = async (req, res) => {
   }
 };
 
-// @desc    Get farmer's products
-// @route   GET /api/products/farmer/:id
-// @access  Public
 export const getFarmerProducts = async (req, res) => {
   try {
     const products = await Product.find({ 
@@ -298,7 +247,6 @@ export const getFarmerProducts = async (req, res) => {
       count: products.length,
       products
     });
-
   } catch (error) {
     res.status(500).json({ 
       success: false,

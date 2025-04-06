@@ -1,92 +1,158 @@
 import multer from 'multer';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
+import { v2 as cloudinary } from 'cloudinary';
+import { fileURLToPath } from 'url';
 
+// Get __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
+// Cloudinary configuration with safe initialization
+let cloudinaryConfigured = false;
 
-// Local storage for temporary uploads
-const storage = multer.diskStorage({
-  destination: function(req, file, cb) {
-    const uploadPath = path.join(__dirname, '../uploads');
-    // Create uploads directory if it doesn't exist
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
+const configureCloudinary = () => {
+  if (!cloudinaryConfigured) {
+    if (!process.env.CLOUDINARY_CLOUD_NAME || 
+        !process.env.CLOUDINARY_API_KEY || 
+        !process.env.CLOUDINARY_API_SECRET) {
+      console.warn('⚠️ Cloudinary environment variables not loaded yet');
+      return false;
     }
-    cb(null, uploadPath);
+
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+      secure: true
+    });
+    cloudinaryConfigured = true;
+    console.log('✅ Cloudinary configured successfully');
+    return true;
+  }
+  return true;
+};
+
+// Local storage configuration
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, '../uploads');
+    
+    try {
+      if (!fs.existsSync(uploadPath)) {
+        fs.mkdirSync(uploadPath, { recursive: true });
+      }
+      cb(null, uploadPath);
+    } catch (err) {
+      console.error('❌ Storage setup error:', err);
+      cb(err);
+    }
   },
-  filename: function(req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+    cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
   }
 });
 
+// File type validation
 const fileFilter = (req, file, cb) => {
-  const filetypes = /jpe?g|png|webp/;
-  const mimetypes = /image\/jpe?g|image\/png|image\/webp/;
-
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = mimetypes.test(file.mimetype);
-
-  if (extname && mimetype) {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Only images (JPEG, PNG, WEBP) are allowed!'), false);
+    cb(new Error(`Invalid file type. Only ${allowedTypes.join(', ')} are allowed.`), false);
   }
 };
 
-const upload = multer({ 
-  storage, 
+// Multer instance
+export const upload = multer({
+  storage,
   fileFilter,
-  limits: { 
+  limits: {
     fileSize: 5 * 1024 * 1024, // 5MB
-    files: 5 // Maximum 5 files
+    files: 5
   }
 });
 
-// Middleware to upload to Cloudinary and clean up local files
+// Enhanced Cloudinary upload with debugging and preset support
 export const uploadToCloudinary = async (req, res, next) => {
-  if (!req.files && !req.file) return next();
+  if (!req.files?.length) {
+    console.log('ℹ️ No files to upload');
+    return next();
+  }
+
+  if (!configureCloudinary()) {
+    return next(new Error('Cloudinary configuration not ready'));
+  }
+
+  console.log(`⬆️ Starting upload of ${req.files.length} file(s)`);
 
   try {
-    // Handle single file
-    if (req.file) {
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: 'agriCart/uploads'
-      });
-      req.file.url = result.secure_url;
-      fs.unlinkSync(req.file.path); // Remove local file
-    }
-    
-    // Handle multiple files
-    if (req.files) {
-      const uploadPromises = req.files.map(async file => {
-        const result = await cloudinary.uploader.upload(file.path, {
-          folder: 'agriCart/uploads'
-        });
-        file.url = result.secure_url;
-        fs.unlinkSync(file.path); // Remove local file
-        return file;
-      });
-      await Promise.all(uploadPromises);
-    }
+    const uploadResults = await Promise.all(
+      req.files.map(async (file) => {
+        try {
+          console.log(`↗️ Uploading ${file.originalname}...`);
+          
+          const uploadOptions = {
+            folder: process.env.CLOUDINARY_FOLDER || 'agriCart/products',
+            quality: 'auto:good',
+            resource_type: 'image',
+            timeout: parseInt(process.env.CLOUDINARY_TIMEOUT) || 30000
+          };
 
+          // Add upload preset if configured
+          if (process.env.CLOUDINARY_UPLOAD_PRESET) {
+            uploadOptions.upload_preset = process.env.CLOUDINARY_UPLOAD_PRESET;
+          }
+
+          const result = await cloudinary.uploader.upload(file.path, uploadOptions);
+
+          console.log(`✅ Uploaded ${file.originalname}`, {
+            url: result.secure_url,
+            bytes: result.bytes,
+            public_id: result.public_id
+          });
+
+          // Cleanup local file
+          try {
+            fs.unlinkSync(file.path);
+          } catch (cleanupErr) {
+            console.warn(`⚠️ Could not delete ${file.path}:`, cleanupErr);
+          }
+
+          return {
+            url: result.secure_url,
+            public_id: result.public_id
+          };
+        } catch (fileError) {
+          console.error(`❌ Failed to upload ${file.originalname}:`, {
+            message: fileError.message,
+            code: fileError.http_code || 'N/A'
+          });
+          throw fileError;
+        }
+      })
+    );
+
+    req.files = uploadResults;
     next();
   } catch (error) {
-    // Clean up any uploaded files if error occurs
-    if (req.file) fs.unlinkSync(req.file.path);
-    if (req.files) req.files.forEach(file => fs.unlinkSync(file.path));
-    next(error);
+    console.error('💥 Critical upload error:', {
+      message: error.message,
+      code: error.http_code || 'N/A',
+      stack: error.stack
+    });
+    
+    // Cleanup all files if error occurs
+    req.files?.forEach(file => {
+      try {
+        if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+      } catch (cleanupErr) {
+        console.warn('Cleanup failed:', cleanupErr);
+      }
+    });
+
+    next(new Error(`Image upload failed: ${error.message}`));
   }
 };
-
-export default upload;

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import StarRating from './StarRating';
-import { createReview } from '../services/api';
+import { productAPI } from '../services/api'; // Updated import
 
 const ReviewForm = ({ productId, onReviewAdded }) => {
   const [rating, setRating] = useState(0);
@@ -19,7 +19,7 @@ const ReviewForm = ({ productId, onReviewAdded }) => {
 
     try {
       setLoading(true);
-      await createReview(productId, { rating, comment });
+      await productAPI.createReview(productId, { rating, comment }); // Updated API call
       toast.success('Review submitted successfully!');
       setRating(0);
       setComment('');

@@ -1,3 +1,5 @@
+import { useState } from 'react'; // Add this import at the top
+
 const FilterSidebar = ({
   categories,
   filters,

@@ -1,0 +1,33 @@
+/agricart/backend$ tree
+.
+├── controllers
+│   ├── adminController.js
+│   ├── authController.js
+│   ├── orderController.js
+│   ├── paymentController.js
+│   ├── productController.js
+│   └── userController.js
+├── middleware
+│   ├── authMiddleware.js
+│   └── errorMiddleware.js
+├── models
+│   ├── Order.js
+│   ├── Product.js
+│   └── User.js
+├── package.json
+├── package-lock.json
+├── README.md
+├── routes
+│   ├── adminRoutes.js
+│   ├── authRoutes.js
+│   ├── orderRoutes.js
+│   ├── paymentRoutes.js
+│   ├── productRoutes.js
+│   └── userRoutes.js
+├── server.js
+├── uploads
+│   └── images-1743802977292-919305053.png
+└── utils
+    └── uploadMiddleware.js
+
+7 directories, 23 files

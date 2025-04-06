@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { fetchProducts, getProductsByCategory } from '../services/api';
+import { productAPI } from '../services/api';
 import ProductCard from '../components/ProductCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useAuth } from '../contexts/AuthContext';
@@ -54,7 +54,7 @@ export default function Products() {
         const params = {
           page: currentPage,
           limit,
-          keyword,
+          search: keyword,
           minPrice,
           maxPrice,
           organic: organic || undefined,
@@ -63,13 +63,13 @@ export default function Products() {
 
         let response;
         if (category) {
-          response = await getProductsByCategory(category, params);
+          response = await productAPI.getProductsByCategory(category, params);
         } else {
-          response = await fetchProducts(params);
+          response = await productAPI.getProducts(params);
         }
 
-        setProducts(response.data);
-        setTotalProducts(response.total);
+        setProducts(response.data.products || response.data);
+        setTotalProducts(response.data.total || response.total || 0);
       } catch (error) {
         toast.error('Failed to load products');
         console.error(error);

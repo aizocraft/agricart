@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect, useContext, useCallback } from 'react';
-import { login, register, getMe, refreshToken } from '../services/api';
+import { authAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      const { data } = await getMe();
+      const { data } = await authAPI.getMe();
       setUser(data.user);
       setIsAuthenticated(true);
       sessionStorage.setItem('user', JSON.stringify(data.user));
@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }) => {
   // Handle token refresh
   const handleTokenRefresh = useCallback(async () => {
     try {
-      const { data } = await refreshToken();
+      const { data } = await authAPI.refreshToken();
       localStorage.setItem('token', data.token);
       return true;
     } catch (error) {
@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }) => {
     }, REFRESH_INTERVAL);
 
     return () => clearInterval(refreshInterval);
-  }, [checkAuth, handleTokenRefresh, isAuthenticated]);
+  }, [checkAuth, handleTokenRefresh, isAuthenticated, REFRESH_INTERVAL]);
 
   // Login function
   const loginUser = async (credentials) => {
@@ -82,7 +82,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       clearAuthData();
       
-      const { data } = await login(credentials);
+      const { data } = await authAPI.login(credentials);
       
       localStorage.setItem('token', data.token);
       sessionStorage.setItem('user', JSON.stringify(data.user));
@@ -132,7 +132,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       clearAuthData();
       
-      const { data } = await register(userData);
+      const { data } = await authAPI.register(userData);
       
       localStorage.setItem('token', data.token);
       sessionStorage.setItem('user', JSON.stringify(data.user));

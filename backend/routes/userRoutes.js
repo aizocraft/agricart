@@ -9,7 +9,7 @@ import {
   toggleUserActive
 } from '../controllers/userController.js';
 import { protect, adminOnly } from '../middleware/authMiddleware.js';
-import upload from '../utils/uploadMiddleware.js';
+import { upload } from '../utils/uploadMiddleware.js';
 
 const router = express.Router();
 

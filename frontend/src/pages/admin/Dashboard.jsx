@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { getAdminStats, getAdminUsers } from '../../services/api'
+import { adminAPI } from '../../services/api'  // Updated import
 import { toast } from 'react-hot-toast'
 
 export default function AdminDashboard() {
@@ -15,8 +15,8 @@ export default function AdminDashboard() {
       try {
         setLoading(true)
         const [statsRes, usersRes] = await Promise.all([
-          getAdminStats(),
-          getAdminUsers()
+          adminAPI.getStats(),       // Updated API call
+          adminAPI.getUsers()        // Updated API call
         ])
         setStats(statsRes.data)
         setUsers(usersRes.data)

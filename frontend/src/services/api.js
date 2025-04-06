@@ -1,4 +1,3 @@
-// src/services/api.js
 import axios from "axios";
 import { toast } from "react-hot-toast";
 
@@ -25,14 +24,14 @@ API.interceptors.request.use(
 // Response Interceptor
 API.interceptors.response.use(
   (response) => {
-    // Cache GET requests
     if (response.config.method === "get" && response.data) {
       const url = response.config.url;
+      const cacheKey = `cache_${url}`;
       const cacheData = {
         data: response.data,
         timestamp: Date.now(),
       };
-      sessionStorage.setItem(`cache_${url}`, JSON.stringify(cacheData));
+      sessionStorage.setItem(cacheKey, JSON.stringify(cacheData));
     }
     return response;
   },
@@ -52,115 +51,163 @@ API.interceptors.response.use(
           toast.error("Resource not found");
           break;
         case 500:
-          toast.error("Server error. Please try again later.");
+          toast.error(error.response.data?.message || "Server error. Please try again later.");
           break;
         default:
-          toast.error(
-            error.response.data?.message || "An error occurred"
-          );
+          toast.error(error.response.data?.message || "An error occurred");
       }
+    } else {
+      toast.error("Network error. Please check your connection.");
     }
     return Promise.reject(error);
   }
 );
 
-// Helper function for cached GET requests
+// Enhanced cached GET requests helper
 const cachedGet = async (url, params = {}) => {
-  const cacheKey = `cache_${url}`;
+  const cacheKey = `cache_${url}?${new URLSearchParams(params).toString()}`;
   const cachedData = sessionStorage.getItem(cacheKey);
   
   if (cachedData) {
     const { data, timestamp } = JSON.parse(cachedData);
-    // Use cache if less than 5 minutes old
+    // Cache valid for 5 minutes (300000 ms)
     if (Date.now() - timestamp < 300000) {
       return { data };
     }
   }
   
-  return API.get(url, { params });
+  const response = await API.get(url, { params });
+  return response;
 };
 
 // Authentication API
-export const login = (credentials) => API.post("/auth/login", credentials);
-export const register = (userData) => API.post("/auth/register", userData);
-export const getMe = () => cachedGet("/auth/me");
+export const authAPI = {
+  login: (credentials) => API.post("/auth/login", credentials),
+  register: (userData) => API.post("/auth/register", userData),
+  getMe: () => cachedGet("/auth/me"),
+  refreshToken: () => API.post('/auth/refresh'),
+  logout: () => API.post('/auth/logout'),
+};
 
 // Products API
-export const fetchProducts = (params = {}) => cachedGet("/products", params);
-export const fetchProductById = (id) => cachedGet(`/products/${id}`);
-export const createProduct = (productData) => {
-  const formData = new FormData();
-  Object.entries(productData).forEach(([key, value]) => {
-    if (key === "images" && Array.isArray(value)) {
-      value.forEach((file) => formData.append("images", file));
-    } else {
-      formData.append(key, value);
-    }
-  });
-  return API.post("/products", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
+export const productAPI = {
+  // Get products with filters, pagination, and sorting
+  getProducts: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    
+    // Handle all possible query parameters
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    if (params.sort) queryParams.append('sort', params.sort);
+    if (params.search) queryParams.append('search', params.search);
+    if (params.category) queryParams.append('category', params.category);
+    if (params.organic) queryParams.append('organic', params.organic);
+    
+    return cachedGet(`/products?${queryParams.toString()}`);
+  },
+
+  // Get single product by ID
+  getProductById: (id) => cachedGet(`/products/${id}`),
+
+  // Create new product with image uploads
+  createProduct: (productData) => {
+    const formData = new FormData();
+    
+    // Append all product fields
+    Object.entries(productData).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      
+      if (key === 'images') {
+        // Handle both File objects and existing image URLs
+        productData.images.forEach((file) => {
+          if (file instanceof File) {
+            formData.append('images', file);
+          } else if (typeof file === 'string') {
+            formData.append('existingImages', file);
+          }
+        });
+      } else if (key === 'harvestDate' && value) {
+        formData.append(key, new Date(value).toISOString());
+      } else if (typeof value === 'object') {
+        formData.append(key, JSON.stringify(value));
+      } else {
+        formData.append(key, value);
+      }
+    });
+
+    return API.post('/products', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+
+  // Update product
+  updateProduct: (id, productData) => {
+    const formData = new FormData();
+    
+    Object.entries(productData).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      
+      if (key === 'images') {
+        productData.images.forEach((file) => {
+          if (file instanceof File) {
+            formData.append('images', file);
+          } else if (typeof file === 'string') {
+            formData.append('existingImages', file);
+          }
+        });
+      } else if (key === 'harvestDate' && value) {
+        formData.append(key, new Date(value).toISOString());
+      } else if (typeof value === 'object') {
+        formData.append(key, JSON.stringify(value));
+      } else {
+        formData.append(key, value);
+      }
+    });
+
+    return API.put(`/products/${id}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+
+  // Delete product
+  deleteProduct: (id) => API.delete(`/products/${id}`),
+
+  // Get products by category
+  getProductsByCategory: (category) => cachedGet(`/products/category/${category}`),
+
+  // Get products by farmer
+  getFarmerProducts: (farmerId) => cachedGet(`/products/farmer/${farmerId}`),
 };
-export const updateProduct = (id, productData) => API.put(`/products/${id}`, productData);
-export const deleteProduct = (id) => API.delete(`/products/${id}`);
-export const getProductsByCategory = (category) => cachedGet(`/products/category/${category}`);
-export const getFarmerProducts = (farmerId) => cachedGet(`/products/farmer/${farmerId}`);
 
 // Orders API
-export const createOrder = (orderData) => API.post("/orders", orderData);
-export const getMyOrders = () => cachedGet("/orders/myorders");
-export const getOrderById = (id) => cachedGet(`/orders/${id}`);
-export const updateOrderToPaid = (id, paymentData) => API.put(`/orders/${id}/pay`, paymentData);
-export const updateOrderToDelivered = (id) => API.put(`/orders/${id}/deliver`);
+export const orderAPI = {
+  createOrder: (orderData) => API.post("/orders", orderData),
+  getMyOrders: () => cachedGet("/orders/myorders"),
+  getOrderById: (id) => cachedGet(`/orders/${id}`),
+  updateOrderToPaid: (id, paymentData) => API.put(`/orders/${id}/pay`, paymentData),
+  updateOrderToDelivered: (id) => API.put(`/orders/${id}/deliver`),
+};
 
 // Admin API
-export const getAdminStats = () => cachedGet("/admin/stats");
-export const getAdminUsers = () => cachedGet("/admin/users");
-export const updateUserRole = (id, roleData) => API.put(`/admin/users/${id}`, roleData);
-export const deleteUser = (id) => API.delete(`/admin/users/${id}`);
+export const adminAPI = {
+  getStats: () => cachedGet("/admin/stats"),
+  getUsers: () => cachedGet("/admin/users"),
+  updateUserRole: (id, roleData) => API.put(`/admin/users/${id}`, roleData),
+  deleteUser: (id) => API.delete(`/admin/users/${id}`),
+};
 
 // Payment API
-export const processPayPalPayment = (id, paymentData) => API.post(`/payment/paypal/${id}`, paymentData);
-export const processMpesaPayment = (id, paymentData) => API.post(`/payment/mpesa/${id}`, paymentData);
-export const refreshToken = () => API.post('/auth/refresh');
-
-
-export const createReview = (productId, reviewData) => 
-  API.post(`/products/${productId}/reviews`, reviewData);
-
-export const createFarmerProduct = (productData) => {
-  const formData = new FormData();
-  Object.entries(productData).forEach(([key, value]) => {
-    if (key === "images" && Array.isArray(value)) {
-      value.forEach((file) => formData.append("images", file));
-    } else {
-      formData.append(key, value);
-    }
-  });
-  return API.post("/farmer/products", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
+export const paymentAPI = {
+  paypal: {
+    createPayment: (id, paymentData) => API.post(`/payment/paypal/${id}`, paymentData),
+  },
+  mpesa: {
+    createPayment: (id, paymentData) => API.post(`/payment/mpesa/${id}`, paymentData),
+  },
 };
 
-export const updateFarmerProduct = (id, productData) => {
-  const formData = new FormData();
-  Object.entries(productData).forEach(([key, value]) => {
-    if (key === "images" && Array.isArray(value)) {
-      value.forEach((file) => formData.append("images", file));
-    } else {
-      formData.append(key, value);
-    }
-  });
-  return API.put(`/farmer/products/${id}`, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
-};
-
-export const getFarmerProductById = (id) => API.get(`/farmer/products/${id}`);
 export default API;

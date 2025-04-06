@@ -1,24 +1,29 @@
 import { useEffect } from 'react';
 
-export function useDocumentMetadata({ title, description }) {
+export const useDocumentMetadata = ({ title, description }) => {
   useEffect(() => {
-    document.title = title || '';
-    
+    const originalTitle = document.title;
     const metaDescription = document.querySelector('meta[name="description"]');
-    if (metaDescription) {
-      metaDescription.content = description || '';
-    } else {
-      const meta = document.createElement('meta');
-      meta.name = 'description';
-      meta.content = description || '';
-      document.head.appendChild(meta);
+    const originalDescription = metaDescription?.content;
+
+    if (title) document.title = `${title} | AgriCart`;
+    
+    if (description) {
+      if (metaDescription) {
+        metaDescription.content = description;
+      } else {
+        const meta = document.createElement('meta');
+        meta.name = 'description';
+        meta.content = description;
+        document.head.appendChild(meta);
+      }
     }
     
     return () => {
-      document.title = '';
+      document.title = originalTitle;
       if (metaDescription) {
-        metaDescription.content = '';
+        metaDescription.content = originalDescription;
       }
     };
   }, [title, description]);
-}
+};

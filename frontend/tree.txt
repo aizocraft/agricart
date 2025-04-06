@@ -1,0 +1,60 @@
+/agricart/frontend$ tree
+.
+├── eslint.config.js
+├── index.html
+├── package.json
+├── package-lock.json
+├── postcss.config.js
+├── public
+│   └── vite.svg
+├── README.md
+├── src
+│   ├── App.css
+│   ├── App.jsx
+│   ├── assets
+│   │   └── react.svg
+│   ├── components
+│   │   ├── ErrorBoundary.jsx
+│   │   ├── FilterSidebar.jsx
+│   │   ├── Footer.jsx
+│   │   ├── ImageGallery.jsx
+│   │   ├── LoadingSpinner.jsx
+│   │   ├── Navbar.jsx
+│   │   ├── Pagination.jsx
+│   │   ├── ProductCard.jsx
+│   │   ├── ProtectedRoute.jsx
+│   │   ├── ReviewForm.jsx
+│   │   ├── SearchFilters.jsx
+│   │   └── StarRating.jsx
+│   ├── contexts
+│   │   └── AuthContext.jsx
+│   ├── hooks
+│   │   └── useDocumentMetadata.js
+│   ├── index.css
+│   ├── main.jsx
+│   ├── pages
+│   │   ├── admin
+│   │   │   └── Dashboard.jsx
+│   │   ├── auth
+│   │   │   ├── Login.jsx
+│   │   │   └── Register.jsx
+│   │   ├── Cart.jsx
+│   │   ├── farmer
+│   │   │   ├── Dashboard.jsx
+│   │   │   └── ProductForm.jsx
+│   │   ├── Home.jsx
+│   │   ├── NotFound.jsx
+│   │   ├── OrderDetails.jsx
+│   │   ├── Orders.jsx
+│   │   ├── ProductDetails.jsx
+│   │   └── Products.jsx
+│   ├── services
+│   │   └── api.js
+│   └── store
+│       ├── cartSlice.js
+│       └── store.js
+├── tailwind.config.js
+├── uploads
+└── vite.config.js
+
+14 directories, 43 files
