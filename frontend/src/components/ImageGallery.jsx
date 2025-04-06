@@ -4,6 +4,7 @@ import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 const ImageGallery = ({ images, selected = 0, onSelect }) => {
   const [zoom, setZoom] = useState(false);
   const [zoomPosition, setZoomPosition] = useState({ x: 0, y: 0 });
+  const [localSelected, setLocalSelected] = useState(selected);
 
   const handleMouseMove = (e) => {
     if (!zoom) return;
@@ -13,6 +14,16 @@ const ImageGallery = ({ images, selected = 0, onSelect }) => {
     const y = ((e.clientY - top) / height) * 100;
     setZoomPosition({ x, y });
   };
+
+  const handleSelect = (index) => {
+    if (onSelect) {
+      onSelect(index);
+    } else {
+      setLocalSelected(index);
+    }
+  };
+
+  const displayIndex = onSelect ? selected : localSelected;
 
   return (
     <div className="space-y-4">
@@ -24,8 +35,8 @@ const ImageGallery = ({ images, selected = 0, onSelect }) => {
         onMouseMove={handleMouseMove}
       >
         <img
-          src={images[selected]}
-          alt={`Product view ${selected + 1}`}
+          src={images[displayIndex]}
+          alt={`Product view ${displayIndex + 1}`}
           className={`w-full h-full object-contain transition-transform duration-300 ${
             zoom ? 'scale-150' : 'scale-100'
           }`}
@@ -47,9 +58,9 @@ const ImageGallery = ({ images, selected = 0, onSelect }) => {
             <button
               key={index}
               type="button"
-              onClick={() => onSelect(index)}
+              onClick={() => handleSelect(index)}
               className={`aspect-square rounded-md overflow-hidden border-2 ${
-                selected === index ? 'border-green-500' : 'border-transparent'
+                displayIndex === index ? 'border-green-500' : 'border-transparent'
               }`}
             >
               <img

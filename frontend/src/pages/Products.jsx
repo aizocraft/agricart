@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { productAPI } from '../services/api';
 import ProductCard from '../components/ProductCard';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -7,6 +7,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import Pagination from '../components/Pagination';
 import FilterSidebar from '../components/FilterSidebar';
+import { useDispatch, useSelector } from 'react-redux';
+import { addToCart } from '../store/cartSlice';
 
 const categories = [
   'Fruits',
@@ -21,11 +23,24 @@ const categories = [
   'Other'
 ];
 
+const locations = [
+  'North',
+  'South',
+  'East',
+  'West',
+  'Central',
+  'Coastal',
+  'Mountain',
+  'Urban',
+  'Rural'
+];
+
 const sortOptions = [
   { value: 'price-asc', label: 'Price: Low to High' },
   { value: 'price-desc', label: 'Price: High to Low' },
   { value: 'rating-desc', label: 'Top Rated' },
-  { value: 'newest', label: 'Newest Arrivals' }
+  { value: 'newest', label: 'Newest Arrivals' },
+  { value: 'location', label: 'Nearest First' }
 ];
 
 export default function Products() {
@@ -35,6 +50,9 @@ export default function Products() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const cartItems = useSelector(state => state.cart.cartItems);
 
   // Get current filters from URL
   const currentPage = parseInt(searchParams.get('page')) || 1;
@@ -43,6 +61,7 @@ export default function Products() {
   const minPrice = searchParams.get('minPrice') || '';
   const maxPrice = searchParams.get('maxPrice') || '';
   const organic = searchParams.get('organic') === 'true';
+  const locationFilter = searchParams.get('location') || '';
   const sort = searchParams.get('sort') || 'newest';
   const limit = 12;
 
@@ -58,6 +77,7 @@ export default function Products() {
           minPrice,
           maxPrice,
           organic: organic || undefined,
+          location: locationFilter || undefined,
           sort
         };
 
@@ -79,7 +99,31 @@ export default function Products() {
     };
 
     loadProducts();
-  }, [currentPage, keyword, category, minPrice, maxPrice, organic, sort]);
+  }, [currentPage, keyword, category, minPrice, maxPrice, organic, locationFilter, sort]);
+
+  const handleAddToCart = (product) => {
+    if (!user) {
+      toast.error('Please login to add items to cart');
+      navigate('/auth/login');
+      return;
+    }
+
+    const cartItem = {
+      product: product._id,
+      name: product.name,
+      image: product.images[0],
+      price: product.price,
+      stock: product.stock,
+      quantity: 1,
+      unit: product.unit,
+      farmer: product.farmer,
+      farmName: product.farmer?.farmName || 'Local Farm',
+      location: product.location
+    };
+
+    dispatch(addToCart(cartItem));
+    toast.success(`${product.name} added to cart`);
+  };
 
   const handleFilterChange = (name, value) => {
     const newParams = new URLSearchParams(searchParams);
@@ -112,6 +156,7 @@ export default function Products() {
     ...(minPrice ? [`Min Price: $${minPrice}`] : []),
     ...(maxPrice ? [`Max Price: $${maxPrice}`] : []),
     ...(organic ? ['Organic Only'] : []),
+    ...(locationFilter ? [`Location: ${locationFilter}`] : []),
     ...(sort !== 'newest' ? [`Sorted: ${sortOptions.find(o => o.value === sort)?.label}`] : [])
   ];
 
@@ -121,6 +166,7 @@ export default function Products() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-900">
             {category ? `${category} Products` : 'All Products'}
+            {locationFilter && ` from ${locationFilter}`}
           </h1>
           {user?.role === 'farmer' && (
             <Link
@@ -154,12 +200,14 @@ export default function Products() {
           <div className="hidden lg:block">
             <FilterSidebar
               categories={categories}
+              locations={locations}
               filters={{
                 keyword,
                 category,
                 minPrice,
                 maxPrice,
                 organic,
+                location: locationFilter,
                 sort
               }}
               onChange={handleFilterChange}
@@ -194,6 +242,8 @@ export default function Products() {
                           handleFilterChange('maxPrice', '');
                         } else if (filterName === 'organic only') {
                           handleFilterChange('organic', '');
+                        } else if (filterName === 'location') {
+                          handleFilterChange('location', '');
                         } else if (filterName === 'sorted') {
                           handleFilterChange('sort', 'newest');
                         }
@@ -250,13 +300,18 @@ export default function Products() {
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {products.map((product) => (
-                    <ProductCard 
-                      key={product._id} 
-                      product={product} 
-                      className="hover:shadow-lg transition-shadow duration-300"
-                    />
-                  ))}
+                  {products.map((product) => {
+                    const isInCart = cartItems.some(item => item.product === product._id);
+                    return (
+                      <ProductCard 
+                        key={product._id} 
+                        product={product} 
+                        className="hover:shadow-lg transition-shadow duration-300"
+                        onAddToCart={() => handleAddToCart(product)}
+                        isInCart={isInCart}
+                      />
+                    );
+                  })}
                 </div>
                 
                 <Pagination
@@ -292,12 +347,14 @@ export default function Products() {
             <div className="p-4 overflow-y-auto h-[calc(100%-60px)]">
               <FilterSidebar
                 categories={categories}
+                locations={locations}
                 filters={{
                   keyword,
                   category,
                   minPrice,
                   maxPrice,
                   organic,
+                  location: locationFilter,
                   sort
                 }}
                 onChange={(name, value) => {

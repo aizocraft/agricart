@@ -3,7 +3,10 @@ import { ShoppingCart, User, Menu, LogOut, ChevronDown, Sun, Moon } from 'react-
 import { useSelector } from 'react-redux';
 import { useAuth } from '../contexts/AuthContext';
 import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+// eslint-disable-next-line no-unused-vars
+import { motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
+
 
 export default function Navbar() {
   const { cartItems } = useSelector(state => state.cart);
@@ -99,26 +102,6 @@ export default function Navbar() {
     }
   };
 
-  const cartNotificationVariants = {
-    initial: { scale: 0 },
-    animate: { 
-      scale: 1,
-      transition: { 
-        type: 'spring',
-        stiffness: 500,
-        damping: 15
-      }
-    },
-    hover: { 
-      scale: 1.2,
-      rotate: [0, 10, -10, 0],
-      transition: { 
-        type: 'spring',
-        stiffness: 600,
-        damping: 10
-      } 
-    }
-  };
 
   // Theme colors
   const themeColors = {
@@ -503,6 +486,12 @@ const MobileLink = ({ to, onClick, children, darkMode }) => {
       </Link>
     </motion.div>
   );
+};
+
+// Animation variants for cart notification
+const cartNotificationVariants = {
+  hover: { scale: 1.2 },
+  initial: { scale: 1 },
 };
 
 const CartIcon = ({ cartItems, darkMode }) => {

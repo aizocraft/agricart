@@ -1,67 +1,66 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { productAPI, orderAPI } from '../services/api';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { 
+  FaMapMarkerAlt, 
+  FaLeaf, 
+  FaShoppingCart, 
+  FaStar, 
+  FaRegStar, 
+  FaChevronLeft,
+  FaCheck // Add this import
+} from 'react-icons/fa';
+import { productAPI } from '../services/api';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ImageGallery from '../components/ImageGallery';
+import StarRating from '../components/StarRating';
+import ReviewForm from '../components/ReviewForm';
+import { useAuth } from '../contexts/AuthContext';
 import { useDispatch, useSelector } from 'react-redux';
 import { addToCart } from '../store/cartSlice';
-import { useAuth } from '../contexts/AuthContext';
-import StarRating from '../components/StarRating';
-import ImageGallery from '../components/ImageGallery';
-import ReviewForm from '../components/ReviewForm';
-import LoadingSpinner from '../components/LoadingSpinner';
 
-export default function ProductDetails() {
+ export default function ProductDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const dispatch = useDispatch();
   const { user } = useAuth();
-  const { cartItems } = useSelector(state => state.cart);
+  const dispatch = useDispatch();
+  const cartItems = useSelector(state => state.cart.cartItems);
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [relatedProducts, setRelatedProducts] = useState([]);
   const [activeTab, setActiveTab] = useState('description');
-  const [selectedImage, setSelectedImage] = useState(0);
+  const [reviews, setReviews] = useState([]);
+
+  const isInCart = cartItems.some(item => item.product === id);
+  const outOfStock = product?.stock === 0;
 
   useEffect(() => {
     const fetchProduct = async () => {
       try {
         setLoading(true);
-        setError(null);
-        const response = await productAPI.getProductById(id);
+        const { data } = await productAPI.getProductById(id);
+        setProduct(data.product || data);
         
-        if (!response?.data) {
-          throw new Error('Product not found');
+        // Fetch related products
+        if (data.product?.category || data?.category) {
+          const category = data.product?.category || data?.category;
+          const { data: related } = await productAPI.getProducts({ 
+            category, 
+            limit: 4,
+            sort: 'rating-desc'
+          });
+          setRelatedProducts(related.products || related);
         }
 
-        const productData = response.data;
-
-        // Validate and normalize product data
-        const validatedProduct = {
-          _id: productData._id,
-          name: productData.name || 'Product Name',
-          images: Array.isArray(productData.images) && productData.images.length > 0 
-            ? productData.images 
-            : ['/placeholder-product.jpg'],
-          rating: typeof productData.rating === 'number' ? productData.rating : 0,
-          numReviews: typeof productData.numReviews === 'number' ? productData.numReviews : 0,
-          stock: typeof productData.stock === 'number' ? productData.stock : 0,
-          price: typeof productData.price === 'number' ? productData.price : 0,
-          organic: Boolean(productData.organic),
-          category: productData.category || 'General',
-          subCategory: productData.subCategory || '',
-          location: productData.location || 'Not specified',
-          harvestDate: productData.harvestDate || null,
-          description: productData.description || 'No description available',
-          farmer: productData.farmer || null,
-          reviews: Array.isArray(productData.reviews) ? productData.reviews : []
-        };
-
-        setProduct(validatedProduct);
+        // Fetch reviews (assuming your API has this endpoint)
+        // const { data: reviewsData } = await productAPI.getProductReviews(id);
+        // setReviews(reviewsData.reviews || []);
       } catch (err) {
-        setError(err.message || 'Failed to load product details');
-        toast.error(err.message || 'Failed to load product details');
+        setError(err.response?.data?.message || 'Failed to load product');
+        toast.error('Failed to load product details');
       } finally {
         setLoading(false);
       }
@@ -73,329 +72,372 @@ export default function ProductDetails() {
   const handleAddToCart = () => {
     if (!user) {
       toast.error('Please login to add items to cart');
-      navigate('/login', { state: { from: `/products/${id}` } });
+      navigate('/auth/login');
       return;
     }
 
-    if (!product || product.stock <= 0) {
+    if (outOfStock) {
       toast.error('This product is out of stock');
       return;
     }
 
-    dispatch(addToCart({
+    const cartItem = {
       product: product._id,
       name: product.name,
-      price: product.price,
       image: product.images[0],
+      price: product.price,
+      stock: product.stock,
       quantity: quantity,
-      stock: product.stock
-    }));
-    
-    toast.success(`${product.name} added to cart!`);
+      unit: product.unit,
+      farmer: product.farmer,
+      farmName: product.farmer?.farmName || 'Local Farm',
+      location: product.location
+    };
+
+    dispatch(addToCart(cartItem));
+    toast.success(`${product.name} added to cart`);
   };
 
-  const handleBuyNow = async () => {
-    if (!user) {
-      toast.error('Please login to proceed with purchase');
-      navigate('/login', { state: { from: `/products/${id}` } });
-      return;
-    }
-
-    if (!product || product.stock <= 0) {
-      toast.error('This product is out of stock');
-      return;
-    }
-
-    try {
-      const orderData = {
-        orderItems: [{
-          product: product._id,
-          name: product.name,
-          price: product.price,
-          image: product.images[0],
-          quantity: quantity
-        }],
-        itemsPrice: product.price * quantity,
-        taxPrice: (product.price * quantity) * 0.1,
-        shippingPrice: 10,
-        totalPrice: (product.price * quantity) * 1.1 + 10
-      };
-
-      const { data } = await orderAPI.createOrder(orderData);
-      navigate(`/orders/${data._id}/payment`);
-    } catch (error) {
-      toast.error(error.message || 'Failed to create order');
-    }
+  const handleQuantityChange = (newQuantity) => {
+    const validatedQuantity = Math.max(1, Math.min(newQuantity, product.stock));
+    setQuantity(validatedQuantity);
   };
-
-  const isInCart = product ? cartItems.some(item => item.product === product._id) : false;
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-12 flex justify-center">
-        <LoadingSpinner />
+      <div className="flex justify-center items-center min-h-screen">
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
 
-  if (error) {
+  if (error || !product) {
     return (
-      <div className="container mx-auto px-4 py-8 text-center">
-        <h1 className="text-2xl mb-4 text-red-500">{error}</h1>
-        <button 
-          onClick={() => window.location.reload()}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
-        >
-          Try Again
-        </button>
-        <button 
-          onClick={() => navigate('/products')}
-          className="ml-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-        >
-          Browse Products
-        </button>
-      </div>
-    );
-  }
-
-  if (!product) {
-    return (
-      <div className="container mx-auto px-4 py-8 text-center">
-        <h1 className="text-2xl mb-4">Product not found</h1>
-        <button 
-          onClick={() => navigate('/products')}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
-        >
-          Browse Products
-        </button>
+      <div className="max-w-4xl mx-auto px-4 py-8 text-center">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+            {error || 'Product not found'}
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
+            We couldn't find the product you're looking for.
+          </p>
+          <button
+            onClick={() => navigate(-1)}
+            className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition flex items-center mx-auto"
+          >
+            <FaChevronLeft className="mr-2" />
+            Back to Products
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Product Images */}
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <ImageGallery 
-            images={product.images} 
-            selected={selectedImage}
-            onSelect={setSelectedImage}
-          />
-        </div>
-        
-        {/* Product Info */}
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <div className="mb-4">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">{product.name}</h1>
-            <div className="flex items-center mb-2">
-              <StarRating rating={product.rating} />
-              <span className="ml-2 text-sm text-gray-600">
-                ({product.numReviews} review{product.numReviews !== 1 ? 's' : ''})
-              </span>
+    <div className="bg-gray-50 dark:bg-gray-900 min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Breadcrumb Navigation */}
+        <nav className="flex mb-6" aria-label="Breadcrumb">
+          <ol className="inline-flex items-center space-x-1 md:space-x-2">
+            <li className="inline-flex items-center">
+              <Link
+                to="/"
+                className="inline-flex items-center text-sm font-medium text-gray-700 hover:text-green-600 dark:text-gray-400 dark:hover:text-white"
+              >
+                Home
+              </Link>
+            </li>
+            <li>
+              <div className="flex items-center">
+                <svg
+                  className="w-3 h-3 text-gray-400 mx-1"
+                  aria-hidden="true"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 6 10"
+                >
+                  <path
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="m1 9 4-4-4-4"
+                  />
+                </svg>
+                <Link
+                  to="/products"
+                  className="ml-1 text-sm font-medium text-gray-700 hover:text-green-600 md:ml-2 dark:text-gray-400 dark:hover:text-white"
+                >
+                  Products
+                </Link>
+              </div>
+            </li>
+            <li aria-current="page">
+              <div className="flex items-center">
+                <svg
+                  className="w-3 h-3 text-gray-400 mx-1"
+                  aria-hidden="true"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 6 10"
+                >
+                  <path
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="m1 9 4-4-4-4"
+                  />
+                </svg>
+                <span className="ml-1 text-sm font-medium text-gray-500 md:ml-2 dark:text-gray-400">
+                  {product.name}
+                </span>
+              </div>
+            </li>
+          </ol>
+        </nav>
+
+        {/* Main Product Section */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6">
+            {/* Product Images */}
+            <div className="lg:sticky lg:top-4">
+              <ImageGallery images={product.images} />
             </div>
-            {product.organic && (
-              <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full uppercase font-semibold tracking-wide mb-2">
-                Organic Certified
-              </span>
-            )}
-          </div>
-          
-          <div className="mb-6">
-            <p className="text-3xl font-semibold text-green-600 mb-4">
-              ${product.price.toFixed(2)}
-            </p>
-            
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold mb-2">Stock Status</h2>
-              <p className={product.stock > 0 ? 'text-green-600' : 'text-red-600'}>
+
+            {/* Product Info */}
+            <div>
+              <div className="flex justify-between items-start">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                    {product.name}
+                  </h1>
+                  <div className="flex items-center mt-2">
+                    <StarRating rating={product.rating || 0} />
+                    <span className="ml-2 text-sm text-gray-600 dark:text-gray-300">
+                      ({product.numReviews || 0} reviews)
+                    </span>
+                  </div>
+                </div>
+                {product.organic && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    <FaLeaf className="mr-1" />
+                    Organic
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-4 flex items-center text-sm text-gray-500 dark:text-gray-400">
+                <FaMapMarkerAlt className="text-green-500 dark:text-green-300 mr-1" />
+                <span>
+                  {product.location} • {product.farmer?.farmName || 'Local Farm'}
+                </span>
+              </div>
+
+              <div className="mt-6">
+                <h2 className="text-2xl font-bold text-green-700 dark:text-green-400">
+                  Ksh {product.price.toLocaleString()}
+                  <span className="text-base font-normal text-gray-500 dark:text-gray-400 ml-1">
+                    / {product.unit}
+                  </span>
+                </h2>
+
                 {product.stock > 0 ? (
-                  <>
-                    <span className="font-bold">{product.stock}</span> available
-                  </>
-                ) : 'Out of stock'}
-              </p>
-            </div>
-            
-            {product.stock > 0 ? (
-              <div className="space-y-4 mb-6">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center border rounded-lg overflow-hidden">
-                    <button 
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 transition"
+                  <p className="text-green-600 dark:text-green-400 mt-1">
+                    In Stock ({product.stock} available)
+                  </p>
+                ) : (
+                  <p className="text-red-500 dark:text-red-400 mt-1">Out of Stock</p>
+                )}
+              </div>
+
+              {product.harvestDate && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Harvested on: {new Date(product.harvestDate).toLocaleDateString()}
+                  </p>
+                </div>
+              )}
+
+              {/* Quantity Selector */}
+              {product.stock > 0 && (
+                <div className="mt-6">
+                  <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Quantity
+                  </label>
+                  <div className="flex items-center">
+                    <button
+                      onClick={() => handleQuantityChange(quantity - 1)}
                       disabled={quantity <= 1}
+                      className="px-3 py-1 border border-gray-300 rounded-l-md bg-gray-50 text-gray-700 disabled:opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     >
                       -
                     </button>
-                    <span className="px-6 py-2 text-center w-12">{quantity}</span>
-                    <button 
-                      onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 transition"
+                    <input
+                      type="number"
+                      id="quantity"
+                      min="1"
+                      max={product.stock}
+                      value={quantity}
+                      onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
+                      className="w-16 text-center border-t border-b border-gray-300 py-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
+                    <button
+                      onClick={() => handleQuantityChange(quantity + 1)}
                       disabled={quantity >= product.stock}
+                      className="px-3 py-1 border border-gray-300 rounded-r-md bg-gray-50 text-gray-700 disabled:opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     >
                       +
                     </button>
                   </div>
-                  
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={handleAddToCart}
-                      className={`px-6 py-3 rounded-lg font-medium transition ${
-                        isInCart 
-                          ? 'bg-green-100 text-green-800 border border-green-200'
-                          : 'bg-green-600 text-white hover:bg-green-700'
-                      }`}
-                      disabled={isInCart}
-                    >
-                      {isInCart ? '✓ Added to Cart' : 'Add to Cart'}
-                    </button>
-                    
-                    <button
-                      onClick={handleBuyNow}
-                      className="px-6 py-3 bg-yellow-500 text-white rounded-lg font-medium hover:bg-yellow-600 transition"
-                    >
-                      Buy Now
-                    </button>
-                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="mb-6 p-4 bg-gray-100 rounded-lg">
-                <p className="text-gray-700">This product is currently out of stock</p>
+              )}
+
+              {/* Add to Cart Button */}
+              <div className="mt-8">
                 <button
-                  onClick={() => navigate('/products')}
-                  className="mt-2 text-green-600 hover:text-green-800 text-sm"
+                  onClick={handleAddToCart}
+                  disabled={isInCart || outOfStock}
+                  className={`w-full py-3 px-6 rounded-lg font-medium flex items-center justify-center transition-colors ${
+                    outOfStock
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : isInCart
+                      ? 'bg-blue-100 text-blue-700 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
                 >
-                  Browse similar products
+                  {outOfStock ? (
+                    'Out of Stock'
+                  ) : isInCart ? (
+                    <>
+                      <FaCheck className="mr-2" />
+                      Added to Cart
+                    </>
+                  ) : (
+                    <>
+                      <FaShoppingCart className="mr-2" />
+                      Add to Cart
+                    </>
+                  )}
                 </button>
               </div>
-            )}
-            
-            <div className="border-t pt-4">
-              <p className="text-sm text-gray-600">
-                <span className="font-semibold">Category:</span> {product.category}
-                {product.subCategory && ` > ${product.subCategory}`}
-              </p>
-              <p className="text-sm text-gray-600 mt-1">
-                <span className="font-semibold">Location:</span> {product.location}
-              </p>
-              {product.harvestDate && (
-                <p className="text-sm text-gray-600 mt-1">
-                  <span className="font-semibold">Harvest Date:</span> {new Date(product.harvestDate).toLocaleDateString()}
-                </p>
-              )}
+
+              {/* Tabs */}
+              <div className="mt-10">
+                <div className="border-b border-gray-200 dark:border-gray-700">
+                  <nav className="-mb-px flex space-x-8">
+                    <button
+                      onClick={() => setActiveTab('description')}
+                      className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                        activeTab === 'description'
+                          ? 'border-green-500 text-green-600 dark:text-green-400'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                      }`}
+                    >
+                      Description
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('reviews')}
+                      className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                        activeTab === 'reviews'
+                          ? 'border-green-500 text-green-600 dark:text-green-400'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                      }`}
+                    >
+                      Reviews ({product.numReviews || 0})
+                    </button>
+                  </nav>
+                </div>
+
+                <div className="mt-6">
+                  {activeTab === 'description' ? (
+                    <div className="prose max-w-none text-gray-500 dark:text-gray-400">
+                      {product.description || 'No description available.'}
+                    </div>
+                  ) : (
+                    <div>
+                      {user ? (
+                        <ReviewForm 
+                          productId={product._id} 
+                          onReviewSubmit={(newReview) => setReviews([...reviews, newReview])} 
+                        />
+                      ) : (
+                        <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                          <p className="text-gray-600 dark:text-gray-300">
+                            Please <Link to="/auth/login" className="text-green-600 hover:underline dark:text-green-400">login</Link> to leave a review.
+                          </p>
+                        </div>
+                      )}
+
+                      {reviews.length > 0 ? (
+                        <div className="space-y-6">
+                          {reviews.map((review) => (
+                            <div key={review._id} className="border-b border-gray-200 dark:border-gray-700 pb-6">
+                              <div className="flex items-center mb-2">
+                                <div className="font-medium text-gray-900 dark:text-white">
+                                  {review.user?.name || 'Anonymous'}
+                                </div>
+                                <div className="ml-4 flex items-center">
+                                  <StarRating rating={review.rating} />
+                                </div>
+                              </div>
+                              <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                                {new Date(review.createdAt).toLocaleDateString()}
+                              </div>
+                              <p className="text-gray-700 dark:text-gray-300">{review.comment}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 dark:text-gray-400">No reviews yet.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      
-      {/* Tabs */}
-      <div className="mt-8 bg-white rounded-xl shadow-md overflow-hidden">
-        <div className="border-b border-gray-200">
-          <nav className="flex -mb-px">
-            <button
-              onClick={() => setActiveTab('description')}
-              className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                activeTab === 'description'
-                  ? 'border-green-500 text-green-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Description
-            </button>
-            <button
-              onClick={() => setActiveTab('reviews')}
-              className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                activeTab === 'reviews'
-                  ? 'border-green-500 text-green-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Reviews ({product.numReviews})
-            </button>
-            {product.farmer && (
-              <button
-                onClick={() => setActiveTab('farmer')}
-                className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                  activeTab === 'farmer'
-                    ? 'border-green-500 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                About the Farmer
-              </button>
-            )}
-          </nav>
-        </div>
-        
-        <div className="p-6">
-          {activeTab === 'description' && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Product Details</h3>
-              <p className="text-gray-700 whitespace-pre-line">
-                {product.description}
-              </p>
-            </div>
-          )}
-          
-          {activeTab === 'reviews' && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Customer Reviews</h3>
-              {user && (
-                <ReviewForm 
-                  productId={product._id} 
-                  onReviewAdded={() => window.location.reload()} 
-                />
-              )}
-              <div className="mt-6 space-y-6">
-                {product.reviews.length > 0 ? (
-                  product.reviews.map(review => (
-                    <div key={review._id} className="border-b pb-4">
-                      <div className="flex items-center mb-2">
-                        <StarRating rating={review.rating} />
-                        <span className="ml-2 font-medium">{review.user?.name || 'Anonymous'}</span>
-                        <span className="ml-auto text-sm text-gray-500">
-                          {new Date(review.createdAt).toLocaleDateString()}
-                        </span>
+
+        {/* Related Products */}
+        {relatedProducts.length > 0 && (
+          <div className="mt-16">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+              You may also like
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {relatedProducts
+                .filter(p => p._id !== product._id)
+                .slice(0, 4)
+                .map((relatedProduct) => (
+                  <div key={relatedProduct._id} className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                    <Link to={`/products/${relatedProduct._id}`} className="block">
+                      <img
+                        src={relatedProduct.images?.[0]}
+                        alt={relatedProduct.name}
+                        className="w-full h-48 object-cover"
+                      />
+                      <div className="p-4">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                          {relatedProduct.name}
+                        </h3>
+                        <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 mb-2">
+                          <FaMapMarkerAlt className="text-green-500 dark:text-green-300 mr-1" />
+                          <span>{relatedProduct.location}</span>
+                        </div>
+                        <div className="text-green-700 dark:text-green-400 font-bold">
+                          Ksh {relatedProduct.price.toLocaleString()}
+                          <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">
+                            / {relatedProduct.unit}
+                          </span>
+                        </div>
                       </div>
-                      <p className="text-gray-700">{review.comment}</p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-gray-500">No reviews yet. Be the first to review!</p>
-                )}
-              </div>
+                    </Link>
+                  </div>
+                ))}
             </div>
-          )}
-          
-          {activeTab === 'farmer' && product.farmer && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">About the Farmer</h3>
-              <div className="flex items-start space-x-4">
-                <img 
-                  src={product.farmer.avatar || '/default-avatar.png'} 
-                  alt={product.farmer.name}
-                  className="w-16 h-16 rounded-full object-cover"
-                  onError={(e) => {
-                    e.target.src = '/default-avatar.png';
-                  }}
-                />
-                <div>
-                  <h4 className="font-medium">{product.farmer.name}</h4>
-                  <p className="text-sm text-gray-600">{product.farmer.farmName}</p>
-                  <p className="text-sm text-gray-600 mt-1">{product.farmer.location}</p>
-                  <button
-                    onClick={() => navigate(`/products/farmer/${product.farmer._id}`)}
-                    className="mt-2 text-sm text-green-600 hover:text-green-800"
-                  >
-                    View all products from this farmer
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
