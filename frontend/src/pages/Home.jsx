@@ -457,7 +457,7 @@ export default function Home() {
                   variants={fadeIn}
                 >
                   <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                    Why Choose <span className="text-yellow-300">Kenyan</span> FarmConnect
+                    Why Choose <span className="text-yellow-300">Agricart</span> .
                   </h2>
                   <p className="text-green-100 max-w-2xl mx-auto text-lg">
                     Supporting Kenya's agricultural heritage while bringing you the freshest produce

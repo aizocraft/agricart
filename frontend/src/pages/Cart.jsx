@@ -5,9 +5,11 @@ import {
   clearCart, 
   updateQuantity,
   saveShippingAddress,
+  savePaymentMethod,
   selectCartItems,
   selectCartTotal,
-  selectShippingAddress
+  selectShippingAddress,
+  selectPaymentMethod
 } from '../store/cartSlice';
 import { orderAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
@@ -20,18 +22,21 @@ export default function Cart() {
   const cartItems = useSelector(selectCartItems);
   const subtotal = useSelector(selectCartTotal);
   const savedShippingAddress = useSelector(selectShippingAddress);
+  const savedPaymentMethod = useSelector(selectPaymentMethod);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useAuth();
   
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [showAddressForm, setShowAddressForm] = useState(false);
+  const [showPaymentMethod, setShowPaymentMethod] = useState(false);
   const [address, setAddress] = useState(savedShippingAddress || {
     address: '',
     city: '',
     postalCode: '',
-    country: 'Kenya' // Default country
+    country: 'Kenya'
   });
+  const [paymentMethod, setPaymentMethod] = useState(savedPaymentMethod || 'Mpesa');
 
   // Calculate order summary
   const tax = subtotal * 0.1; // 10% tax
@@ -62,6 +67,12 @@ export default function Cart() {
     toast.success('Shipping address saved');
   };
 
+  const savePaymentSelection = () => {
+    dispatch(savePaymentMethod(paymentMethod));
+    setShowPaymentMethod(false);
+    toast.success('Payment method saved');
+  };
+
   const handleCheckout = async () => {
     if (!user) {
       toast.error('Please login to checkout');
@@ -72,6 +83,12 @@ export default function Cart() {
     if (!savedShippingAddress && !showAddressForm) {
       setShowAddressForm(true);
       toast('Please enter your shipping address', { icon: '✏️' });
+      return;
+    }
+
+    if (!savedPaymentMethod && !showPaymentMethod) {
+      setShowPaymentMethod(true);
+      toast('Please select a payment method', { icon: '💳' });
       return;
     }
 
@@ -87,17 +104,17 @@ export default function Cart() {
           unit: item.unit
         })),
         shippingAddress: savedShippingAddress || address,
+        paymentMethod: savedPaymentMethod || paymentMethod,
         itemsPrice: subtotal,
         taxPrice: tax,
         shippingPrice: shipping,
-        totalPrice: total,
-        paymentMethod: 'Mpesa' // Default to Mpesa for Kenyan context
+        totalPrice: total
       };
 
       const { data } = await orderAPI.createOrder(orderData);
       dispatch(clearCart());
       toast.success('Order placed successfully!');
-      navigate(`/orders/${data._id}`);
+      navigate(`/orders`);
     } catch (error) {
       console.error('Checkout error:', error);
       const errorMsg = error.response?.data?.message || 
@@ -252,6 +269,75 @@ export default function Cart() {
                 </motion.div>
               )}
 
+              {/* Payment Method Section */}
+              {showPaymentMethod && (
+                <motion.div 
+                  className="bg-white rounded-xl shadow-sm p-6"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <h3 className="text-lg font-semibold mb-4">Select Payment Method</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="mpesa"
+                        name="paymentMethod"
+                        value="Mpesa"
+                        checked={paymentMethod === 'Mpesa'}
+                        onChange={() => setPaymentMethod('Mpesa')}
+                        className="h-4 w-4 text-green-600 focus:ring-green-500"
+                      />
+                      <label htmlFor="mpesa" className="ml-3 block text-sm font-medium text-gray-700">
+                        M-Pesa
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="paypal"
+                        name="paymentMethod"
+                        value="PayPal"
+                        checked={paymentMethod === 'PayPal'}
+                        onChange={() => setPaymentMethod('PayPal')}
+                        className="h-4 w-4 text-green-600 focus:ring-green-500"
+                      />
+                      <label htmlFor="paypal" className="ml-3 block text-sm font-medium text-gray-700">
+                        PayPal
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="cod"
+                        name="paymentMethod"
+                        value="Cash on Delivery"
+                        checked={paymentMethod === 'Cash on Delivery'}
+                        onChange={() => setPaymentMethod('Cash on Delivery')}
+                        className="h-4 w-4 text-green-600 focus:ring-green-500"
+                      />
+                      <label htmlFor="cod" className="ml-3 block text-sm font-medium text-gray-700">
+                        Cash on Delivery
+                      </label>
+                    </div>
+                  </div>
+                  <div className="flex justify-end mt-4 space-x-3">
+                    <button
+                      onClick={() => setShowPaymentMethod(false)}
+                      className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={savePaymentSelection}
+                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                    >
+                      Save Payment Method
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
               {/* Cart Items Section */}
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <AnimatePresence>
@@ -358,7 +444,7 @@ export default function Cart() {
               </div>
 
               {savedShippingAddress && (
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
                   <h3 className="text-sm font-medium text-gray-600 mb-2">Shipping to</h3>
                   <p className="text-gray-800">
                     {savedShippingAddress.address}, {savedShippingAddress.city}<br />
@@ -369,6 +455,19 @@ export default function Cart() {
                     className="mt-2 text-sm text-green-600 hover:underline"
                   >
                     Change address
+                  </button>
+                </div>
+              )}
+
+              {savedPaymentMethod && (
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="text-sm font-medium text-gray-600 mb-2">Payment Method</h3>
+                  <p className="text-gray-800 capitalize">{savedPaymentMethod.toLowerCase()}</p>
+                  <button
+                    onClick={() => setShowPaymentMethod(true)}
+                    className="mt-2 text-sm text-green-600 hover:underline"
+                  >
+                    Change payment
                   </button>
                 </div>
               )}
