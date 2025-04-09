@@ -56,5 +56,3 @@
 ├── tailwind.config.js
 ├── uploads
 └── vite.config.js
-
-14 directories, 43 files

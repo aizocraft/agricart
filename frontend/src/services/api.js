@@ -187,9 +187,11 @@ export const productAPI = {
 export const orderAPI = {
   createOrder: (orderData) => API.post("/orders", orderData),
   getMyOrders: () => cachedGet("/orders/myorders"),
+  getAllOrders: () => cachedGet("/orders"), // Get orders
   getOrderById: (id) => cachedGet(`/orders/${id}`),
   updateOrderToPaid: (id, paymentData) => API.put(`/orders/${id}/pay`, paymentData),
   updateOrderToDelivered: (id) => API.put(`/orders/${id}/deliver`),
+  adminUpdateOrder: (id, data) => API.put(`/orders/admin/${id}`, data), // Get orders
 };
 
 // Admin API
