@@ -117,7 +117,7 @@ export default function Products() {
       quantity: 1,
       unit: product.unit,
       farmer: product.farmer,
-      farmName: product.farmer?.farmName || 'Local Farm',
+      farmName: product.farmName || 'Local Farm',
       location: product.location
     };
 

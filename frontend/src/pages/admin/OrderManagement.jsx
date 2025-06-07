@@ -18,24 +18,25 @@ export default function OrderManagement() {
       try {
         setLoading(true);
         const response = await orderAPI.getAllOrders();
-        setOrders(response.data || []);
+        const ordersData = response.data?.orders || response.data || [];
+        setOrders(ordersData);
         
         // Build a cache of product names
         const productIds = [
           ...new Set(
-            response.data.flatMap(order => 
-              order.orderItems.map(item => item.product?._id || item.product)
+            ordersData.flatMap(order => 
+              order.orderItems?.map(item => item.product?._id || item.product) || []
             )
           )
         ].filter(Boolean);
 
         if (productIds.length > 0) {
           const productsResponse = await Promise.all(
-            productIds.map(id => productAPI.getProductById(id))
+            productIds.map(id => productAPI.getProductById(id).catch(() => null))
           );
           
           const cache = productsResponse.reduce((acc, res) => {
-            if (res.data) {
+            if (res?.data) {
               acc[res.data._id] = res.data;
             }
             return acc;
@@ -59,7 +60,12 @@ export default function OrderManagement() {
       setUpdatingOrderId(orderId);
       await orderAPI.updateOrderToPaid(orderId, {});
       setOrders(orders.map(order => 
-        order._id === orderId ? { ...order, isPaid: true, paidAt: new Date().toISOString() } : order
+        order._id === orderId ? { 
+          ...order, 
+          isPaid: true, 
+          paidAt: new Date().toISOString(),
+          status: 'Processing'
+        } : order
       ));
       toast.success('Order marked as paid successfully');
     } catch (error) {
@@ -75,7 +81,12 @@ export default function OrderManagement() {
       setUpdatingOrderId(orderId);
       await orderAPI.updateOrderToDelivered(orderId);
       setOrders(orders.map(order => 
-        order._id === orderId ? { ...order, isDelivered: true, deliveredAt: new Date().toISOString() } : order
+        order._id === orderId ? { 
+          ...order, 
+          isDelivered: true, 
+          deliveredAt: new Date().toISOString(),
+          status: 'Delivered'
+        } : order
       ));
       toast.success('Order marked as delivered successfully');
     } catch (error) {
@@ -87,10 +98,11 @@ export default function OrderManagement() {
   };
 
   const filteredOrders = orders.filter(order => {
+    const searchLower = searchTerm.toLowerCase();
     return (
-      order._id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (order.user?.name && order.user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (order.user?.email && order.user.email.toLowerCase().includes(searchTerm.toLowerCase()))
+      order._id?.toLowerCase().includes(searchLower) ||
+      (order.user?.name && order.user.name.toLowerCase().includes(searchLower)) ||
+      (order.user?.email && order.user.email.toLowerCase().includes(searchLower))
     );
   });
 
@@ -111,13 +123,16 @@ export default function OrderManagement() {
   };
 
   const getFarmerDetails = (order) => {
+    if (!order.orderItems) return null;
+    
     // Try to get farmer details from the first product that has them
     for (const item of order.orderItems) {
       if (item.product?.farmer) {
         return item.product.farmer;
       }
-      if (productsCache[item.product?._id || item.product]?.farmer) {
-        return productsCache[item.product._id || item.product].farmer;
+      const productId = item.product?._id || item.product;
+      if (productId && productsCache[productId]?.farmer) {
+        return productsCache[productId].farmer;
       }
     }
     return null;
@@ -133,7 +148,7 @@ export default function OrderManagement() {
     printWindow.document.write(`
       <html>
         <head>
-          <title>Order #${order._id.substring(0, 8)}</title>
+          <title>Order #${order._id?.substring(0, 8) || ''}</title>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
             
@@ -280,14 +295,14 @@ export default function OrderManagement() {
             <img src="${logo}" alt="Company Logo" class="logo">
             <div class="invoice-title">
               <h1>INVOICE</h1>
-              <p>Order #${order._id.substring(0, 8)}</p>
+              <p>Order #${order._id?.substring(0, 8) || ''}</p>
             </div>
           </div>
           
           <div class="info-section">
             <div class="info-box">
               <h3>Order Information</h3>
-              <p><strong>Date:</strong> ${format(new Date(order.createdAt), 'PPpp')}</p>
+              <p><strong>Date:</strong> ${order.createdAt ? format(new Date(order.createdAt), 'PPpp') : 'N/A'}</p>
               <p><strong>Status:</strong> 
                 <span class="status-badge ${order.isDelivered ? 'delivered' : order.isPaid ? 'paid' : 'unpaid'}">
                   ${order.isDelivered ? 'Delivered' : order.isPaid ? 'Paid' : 'Unpaid'}
@@ -320,10 +335,10 @@ export default function OrderManagement() {
                 <tr>
                   <td>${getProductName(item.product)}</td>
                   <td>Ksh ${item.price?.toFixed(2) || '0.00'}</td>
-                  <td>${item.quantity}</td>
-                  <td class="text-right">Ksh ${(item.price * item.quantity)?.toFixed(2) || '0.00'}</td>
+                  <td>${item.quantity || 0}</td>
+                  <td class="text-right">Ksh ${((item.price || 0) * (item.quantity || 0))?.toFixed(2) || '0.00'}</td>
                 </tr>
-              `).join('')}
+              `).join('') || ''}
             </tbody>
             <tfoot>
               <tr class="total-row">
@@ -348,14 +363,14 @@ export default function OrderManagement() {
           <div class="info-section">
             <div class="info-box">
               <h3>Shipping Address</h3>
-              <p>${order.shippingAddress?.address}, ${order.shippingAddress?.city}</p>
-              <p>${order.shippingAddress?.postalCode}, ${order.shippingAddress?.country}</p>
+              <p>${order.shippingAddress?.address || ''}, ${order.shippingAddress?.city || ''}</p>
+              <p>${order.shippingAddress?.postalCode || ''}, ${order.shippingAddress?.country || ''}</p>
             </div>
             
             ${farmer ? `
             <div class="info-box">
               <h3>Farmer Details</h3>
-              <p><strong>Name:</strong> ${farmer.name}</p>
+              <p><strong>Name:</strong> ${farmer.name || 'N/A'}</p>
               <p><strong>Contact:</strong> ${farmer.phone || 'N/A'}</p>
               ${farmer.email ? `<p><strong>Email:</strong> ${farmer.email}</p>` : ''}
             </div>
@@ -454,10 +469,10 @@ export default function OrderManagement() {
               filteredOrders.map((order) => (
                 <tr key={order._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    #{order._id.substring(0, 8)}
+                    #{order._id?.substring(0, 8) || ''}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {format(new Date(order.createdAt), 'PP')}
+                    {order.createdAt ? format(new Date(order.createdAt), 'PP') : 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col">
@@ -477,10 +492,10 @@ export default function OrderManagement() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {order.orderItems?.reduce((acc, item) => acc + item.quantity, 0) || 0}
+                    {order.orderItems?.reduce((acc, item) => acc + (item.quantity || 0), 0) || 0}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    Ksh ${order.totalPrice?.toFixed(2) || '0.00'}
+                    Ksh {order.totalPrice?.toFixed(2) || '0.00'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 text-xs rounded-full ${order.isDelivered ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>

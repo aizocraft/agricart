@@ -68,6 +68,10 @@ const productSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Location is required']
   },
+  farmName: {
+    type: String,
+    required: [true, 'Farm name is required']
+  },
   harvestDate: {
     type: Date,
     validate: {
@@ -87,12 +91,13 @@ const productSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Set location from farmer before saving
+// Set location and farmName from farmer before saving
 productSchema.pre('save', async function(next) {
   if (!this.isModified('location') || !this.location) {
     const farmer = await mongoose.model('User').findById(this.farmer);
     if (farmer) {
       this.location = farmer.location;
+      this.farmName = farmer.farmName;
     }
   }
   next();

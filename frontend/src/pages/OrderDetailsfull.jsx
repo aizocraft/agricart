@@ -25,52 +25,37 @@ export default function OrderDetails() {
       try {
         setLoading(true);
         setError(null);
+        const { data } = await orderAPI.getOrderById(id);
         
-        // Make API call to get order details
-        const response = await orderAPI.getOrderById(id);
-        
-        // Handle different response structures
-        const orderData = response.data?.order || response.data;
-        
-        if (!orderData) {
-          throw new Error('Order data not found in response');
+        if (!data) {
+          throw new Error('Order not found');
         }
 
-        setOrder(orderData);
+        setOrder(data);
         
         // Initialize reviews state for each product
         const initialReviews = {};
-        if (orderData.orderItems && Array.isArray(orderData.orderItems)) {
-          orderData.orderItems.forEach(item => {
-            if (item.product?._id) {
-              initialReviews[item.product._id] = {
-                rating: 0,
-                comment: '',
-                submitted: false
-              };
-            }
-          });
-          setReviews(initialReviews);
-        }
+        data.orderItems?.forEach(item => {
+          if (item.product?._id) {
+            initialReviews[item.product._id] = {
+              rating: 0,
+              comment: '',
+              submitted: false
+            };
+          }
+        });
+        setReviews(initialReviews);
       } catch (err) {
         console.error('Error fetching order details:', err);
-        const errorMessage = err.response?.data?.message || 
-                            err.message || 
-                            'Failed to load order details';
-        setError(errorMessage);
-        toast.error(errorMessage);
-        
-        // Redirect if order not found
-        if (err.response?.status === 404) {
-          navigate('/orders', { replace: true });
-        }
+        setError(err.response?.data?.message || err.message || 'Failed to load order details');
+        toast.error(err.response?.data?.message || 'Failed to load order details');
       } finally {
         setLoading(false);
       }
     };
 
     fetchOrderDetails();
-  }, [id, navigate]);
+  }, [id]);
 
   const handleReviewChange = (productId, field, value) => {
     setReviews(prev => ({
@@ -85,16 +70,15 @@ export default function OrderDetails() {
   const submitReview = async (productId) => {
     try {
       const review = reviews[productId];
-      if (!review || !review.rating) {
+      if (!review?.rating) {
         toast.error('Please select a rating');
         return;
       }
 
-      // Here you would call your API to submit the review
-      // Example: await productAPI.createReview(productId, review);
+      // In a real app, you would call your API here:
+      // await productAPI.createReview(productId, review);
       toast.success('Review submitted successfully!');
       
-      // Update UI to show review was submitted
       setReviews(prev => ({
         ...prev,
         [productId]: {
@@ -111,45 +95,42 @@ export default function OrderDetails() {
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     try {
-      const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+      const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
       return new Date(dateString).toLocaleDateString(undefined, options);
-    } catch (e) {
-      console.error('Error formatting date:', e);
+    } catch {
       return 'Invalid date';
     }
   };
 
   const getStatusSteps = () => {
-    if (!order) return [];
-    
     const steps = [
       { 
         id: 'ordered', 
         name: 'Order Placed', 
         description: 'Your order has been received', 
-        date: order.createdAt,
+        date: order?.createdAt,
         completed: true
       },
       { 
         id: 'paid', 
         name: 'Payment', 
-        description: order.isPaid ? 'Payment completed' : 'Awaiting payment', 
-        date: order.paidAt,
-        completed: order.isPaid
+        description: order?.isPaid ? 'Payment completed' : 'Awaiting payment', 
+        date: order?.paidAt,
+        completed: order?.isPaid
       },
       { 
         id: 'processed', 
         name: 'Processing', 
-        description: order.isPaid ? 'Preparing your order' : 'Will start after payment', 
-        date: order.isPaid ? new Date(order.createdAt).setHours(new Date(order.createdAt).getHours() + 1) : null,
-        completed: order.isPaid
+        description: order?.isPaid ? 'Preparing your order' : 'Will start after payment', 
+        date: order?.isPaid ? new Date(order.createdAt).setHours(new Date(order.createdAt).getHours() + 1) : null,
+        completed: order?.isPaid
       },
       { 
         id: 'delivered', 
         name: 'Delivered', 
-        description: order.isDelivered ? 'Order delivered' : 'On the way', 
-        date: order.deliveredAt,
-        completed: order.isDelivered
+        description: order?.isDelivered ? 'Order delivered' : 'On the way', 
+        date: order?.deliveredAt,
+        completed: order?.isDelivered
       }
     ];
 
@@ -160,9 +141,9 @@ export default function OrderDetails() {
     if (!window.confirm('Are you sure you want to cancel this order?')) return;
     
     try {
-      // Here you would call your API to cancel the order
-      // Example: await orderAPI.cancelOrder(order._id);
-      setOrder(prev => ({ ...prev, status: 'Cancelled' }));
+      // In a real app, you would call:
+      // await orderAPI.cancelOrder(order._id);
+      // setOrder(prev => ({ ...prev, isCancelled: true }));
       toast.success('Order cancelled successfully');
     } catch (error) {
       console.error('Error cancelling order:', error);
@@ -221,16 +202,16 @@ export default function OrderDetails() {
         <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-8">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">
-              Order #{order._id?.substring(0, 8) || 'N/A'}
+              Order #{order._id?.substring(0, 8).toUpperCase() || 'N/A'}
             </h1>
             <p className="text-gray-600">
               Placed on {formatDate(order.createdAt)}
-              {order.status === 'Cancelled' && (
-                <span className="ml-2 bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs">
-                  Cancelled
-                </span>
-              )}
             </p>
+            {order.isCancelled && (
+              <span className="inline-block mt-1 px-2 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded">
+                Cancelled
+              </span>
+            )}
           </div>
           <div className="mt-4 md:mt-0 flex space-x-3">
             <button
@@ -239,7 +220,7 @@ export default function OrderDetails() {
             >
               View Receipt
             </button>
-            {!order.isPaid && user?.role !== 'farmer' && order.status !== 'Cancelled' && (
+            {!order.isPaid && !order.isCancelled && user?.role !== 'farmer' && (
               <button
                 onClick={cancelOrder}
                 className="px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors"
@@ -254,7 +235,7 @@ export default function OrderDetails() {
         <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
           <h2 className="text-lg font-semibold mb-6">Order Status</h2>
           <div className="relative">
-            <div className="absolute top-0 left-4 h-full w-0.5 bg-gray-200" aria-hidden="true"></div>
+            <div className="absolute top-0 left-4 h-full w-0.5 bg-gray-200" />
             <ul className="space-y-8">
               {getStatusSteps().map((step, stepIdx) => (
                 <motion.li 
@@ -266,7 +247,9 @@ export default function OrderDetails() {
                 >
                   <div className="flex items-start">
                     <div className="flex-shrink-0">
-                      <div className={`flex items-center justify-center h-8 w-8 rounded-full ${step.completed ? 'bg-green-500' : 'bg-gray-300'}`}>
+                      <div className={`flex items-center justify-center h-8 w-8 rounded-full ${
+                        step.completed ? 'bg-green-500' : 'bg-gray-300'
+                      }`}>
                         {step.completed ? (
                           <svg className="h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -277,7 +260,9 @@ export default function OrderDetails() {
                       </div>
                     </div>
                     <div className="ml-4">
-                      <h3 className={`text-sm font-medium ${step.completed ? 'text-green-600' : 'text-gray-500'}`}>
+                      <h3 className={`text-sm font-medium ${
+                        step.completed ? 'text-green-600' : 'text-gray-500'
+                      }`}>
                         {step.name}
                       </h3>
                       <p className="text-sm text-gray-500">
@@ -301,20 +286,32 @@ export default function OrderDetails() {
           <nav className="-mb-px flex space-x-8">
             <button
               onClick={() => setActiveTab('items')}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'items' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'items' 
+                  ? 'border-green-500 text-green-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
             >
               Order Items
             </button>
             <button
               onClick={() => setActiveTab('shipping')}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'shipping' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'shipping' 
+                  ? 'border-green-500 text-green-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
             >
               Shipping & Payment
             </button>
             {order.isDelivered && user?.role !== 'farmer' && (
               <button
                 onClick={() => setActiveTab('review')}
-                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'review' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'review' 
+                    ? 'border-green-500 text-green-600' 
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
               >
                 Leave Reviews
               </button>
@@ -332,6 +329,7 @@ export default function OrderDetails() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
+              {/* Order Items Tab */}
               {activeTab === 'items' && (
                 <div className="divide-y divide-gray-200">
                   {order.orderItems?.map((item) => (
@@ -356,7 +354,7 @@ export default function OrderDetails() {
                               {item.quantity || 0} × KES {item.price?.toFixed(2) || '0.00'}
                             </p>
                             {item.product?.organic && (
-                              <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded mt-1">
+                              <span className="inline-block mt-1 px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-800 rounded">
                                 Organic
                               </span>
                             )}
@@ -377,6 +375,7 @@ export default function OrderDetails() {
                 </div>
               )}
 
+              {/* Shipping & Payment Tab */}
               {activeTab === 'shipping' && (
                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div>
@@ -387,31 +386,23 @@ export default function OrderDetails() {
                         {order.shippingAddress?.city || 'N/A'}, {order.shippingAddress?.postalCode || 'N/A'}
                       </p>
                       <p className="text-gray-800">{order.shippingAddress?.country || 'N/A'}</p>
-                      {order.shippingAddress?.phone && (
-                        <p className="text-gray-800 mt-2">Phone: {order.shippingAddress.phone}</p>
-                      )}
                     </div>
                   </div>
                   <div>
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Payment Method</h3>
                     <div className="bg-gray-50 p-4 rounded-lg">
                       <p className="text-gray-800 capitalize">
-                        {order.paymentMethod ? order.paymentMethod.toLowerCase() : 'N/A'}
+                        {order.paymentMethod || 'N/A'}
                       </p>
-                      <p className={`mt-2 ${order.isPaid ? 'text-green-600' : 'text-yellow-600'}`}>
+                      <p className={`mt-2 ${
+                        order.isPaid ? 'text-green-600' : 'text-yellow-600'
+                      }`}>
                         {order.isPaid ? `Paid on ${formatDate(order.paidAt)}` : 'Not Paid'}
                       </p>
-                      {order.isPaid && order.paymentResult && (
-                        <div className="mt-2 text-sm">
-                          <p className="text-gray-500">
-                            Transaction ID: {order.paymentResult.id || 'N/A'}
-                          </p>
-                          {order.paymentResult.status && (
-                            <p className="text-gray-500">
-                              Status: {order.paymentResult.status}
-                            </p>
-                          )}
-                        </div>
+                      {order.paymentResult?.id && (
+                        <p className="text-sm text-gray-500 mt-1">
+                          Transaction ID: {order.paymentResult.id}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -423,7 +414,7 @@ export default function OrderDetails() {
                         <span className="font-medium">KES {order.itemsPrice?.toFixed(2) || '0.00'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Tax (10%)</span>
+                        <span className="text-gray-600">Tax</span>
                         <span className="font-medium">KES {order.taxPrice?.toFixed(2) || '0.00'}</span>
                       </div>
                       <div className="flex justify-between">
@@ -441,6 +432,7 @@ export default function OrderDetails() {
                 </div>
               )}
 
+              {/* Reviews Tab */}
               {activeTab === 'review' && (
                 <div className="p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-6">Rate Your Products</h3>
@@ -457,7 +449,9 @@ export default function OrderDetails() {
                             }}
                           />
                           <div className="flex-grow">
-                            <h4 className="font-medium text-gray-800">{item.name || 'Unnamed Product'}</h4>
+                            <h4 className="font-medium text-gray-800">
+                              {item.name || 'Unnamed Product'}
+                            </h4>
                             {!reviews[item.product?._id]?.submitted ? (
                               <div className="mt-3">
                                 <div className="mb-3">
@@ -465,11 +459,16 @@ export default function OrderDetails() {
                                   <StarRating
                                     rating={reviews[item.product?._id]?.rating || 0}
                                     editable={true}
-                                    onRatingChange={(rating) => handleReviewChange(item.product._id, 'rating', rating)}
+                                    onRatingChange={(rating) => 
+                                      handleReviewChange(item.product._id, 'rating', rating)
+                                    }
                                   />
                                 </div>
                                 <div className="mb-3">
-                                  <label htmlFor={`comment-${item.product?._id}`} className="block text-sm text-gray-600 mb-1">
+                                  <label 
+                                    htmlFor={`comment-${item.product?._id}`} 
+                                    className="block text-sm text-gray-600 mb-1"
+                                  >
                                     Review
                                   </label>
                                   <textarea
@@ -477,7 +476,9 @@ export default function OrderDetails() {
                                     rows="3"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
                                     value={reviews[item.product?._id]?.comment || ''}
-                                    onChange={(e) => handleReviewChange(item.product._id, 'comment', e.target.value)}
+                                    onChange={(e) => 
+                                      handleReviewChange(item.product._id, 'comment', e.target.value)
+                                    }
                                     placeholder="Share your experience with this product..."
                                   />
                                 </div>
@@ -492,9 +493,13 @@ export default function OrderDetails() {
                               <div className="mt-2">
                                 <StarRating rating={reviews[item.product._id].rating} />
                                 {reviews[item.product._id].comment && (
-                                  <p className="mt-2 text-gray-600">{reviews[item.product._id].comment}</p>
+                                  <p className="mt-2 text-gray-600">
+                                    {reviews[item.product._id].comment}
+                                  </p>
                                 )}
-                                <p className="text-sm text-green-600 mt-2">Thank you for your review!</p>
+                                <p className="text-sm text-green-600 mt-2">
+                                  Thank you for your review!
+                                </p>
                               </div>
                             )}
                           </div>
@@ -508,6 +513,7 @@ export default function OrderDetails() {
           </AnimatePresence>
         </div>
 
+        {/* Back Button */}
         <div className="flex justify-end">
           <motion.button
             onClick={() => navigate('/orders')}
@@ -542,7 +548,7 @@ export default function OrderDetails() {
                   <h3 className="text-lg font-semibold">Order Receipt</h3>
                   <div className="flex justify-between text-sm mt-2">
                     <span className="text-gray-600">Order #:</span>
-                    <span>#{order._id?.substring(0, 8) || 'N/A'}</span>
+                    <span>#{order._id?.substring(0, 8).toUpperCase() || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Date:</span>
@@ -553,6 +559,7 @@ export default function OrderDetails() {
                     <span>
                       {order.isPaid ? 'Paid' : 'Pending'} • 
                       {order.isDelivered ? ' Delivered' : ' Processing'}
+                      {order.isCancelled && ' • Cancelled'}
                     </span>
                   </div>
                 </div>
@@ -565,9 +572,6 @@ export default function OrderDetails() {
                     {order.shippingAddress?.city || 'N/A'}, {order.shippingAddress?.postalCode || 'N/A'}
                   </p>
                   <p className="text-sm">{order.shippingAddress?.country || 'N/A'}</p>
-                  {order.shippingAddress?.phone && (
-                    <p className="text-sm">Phone: {order.shippingAddress.phone}</p>
-                  )}
                 </div>
 
                 <div className="border-b pb-4 mb-4">
@@ -577,12 +581,13 @@ export default function OrderDetails() {
                       <div key={index} className="flex justify-between text-sm">
                         <div>
                           <p>{item.name || 'Unnamed Product'}</p>
-                          <p className="text-gray-600">{item.quantity || 0} × KES {item.price?.toFixed(2) || '0.00'}</p>
-                          {item.product?.organic && (
-                            <span className="text-xs text-green-600">Organic</span>
-                          )}
+                          <p className="text-gray-600">
+                            {item.quantity || 0} × KES {item.price?.toFixed(2) || '0.00'}
+                          </p>
                         </div>
-                        <p className="font-medium">KES {((item.price || 0) * (item.quantity || 0)).toFixed(2)}</p>
+                        <p className="font-medium">
+                          KES {((item.price || 0) * (item.quantity || 0)).toFixed(2)}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -594,7 +599,7 @@ export default function OrderDetails() {
                     <span>KES {order.itemsPrice?.toFixed(2) || '0.00'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Tax (10%):</span>
+                    <span>Tax:</span>
                     <span>KES {order.taxPrice?.toFixed(2) || '0.00'}</span>
                   </div>
                   <div className="flex justify-between">

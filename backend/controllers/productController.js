@@ -1,5 +1,6 @@
 import Product from '../models/Product.js';
 import mongoose from 'mongoose';
+ 
 
 export const createProduct = async (req, res) => {
   try {
@@ -32,8 +33,9 @@ export const createProduct = async (req, res) => {
       subCategory,
       images,
       farmer: req.user.id,
-      stock: parseInt(stock),
       location: farmer.location,
+      farmName: farmer.farmName,
+      stock: parseInt(stock),
       organic: organic === 'true' || organic === true,
       harvestDate: harvestDate || undefined
     });
@@ -107,7 +109,7 @@ export const getProducts = async (req, res) => {
 
 export const getProductById = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id).populate('farmer', 'name email');
+    const product = await Product.findById(req.params.id).populate('farmer', 'name email farmName');
     
     if (!product) {
       return res.status(404).json({ 
@@ -158,7 +160,8 @@ export const updateProduct = async (req, res) => {
         images,
         price: parseFloat(req.body.price),
         stock: parseInt(req.body.stock),
-        organic: req.body.organic === 'true' || req.body.organic === true
+        organic: req.body.organic === 'true' || req.body.organic === true,
+        farmName: req.body.farmName
       },
       { new: true, runValidators: true }
     );
@@ -220,7 +223,7 @@ export const getProductsByCategory = async (req, res) => {
   try {
     const products = await Product.find({ 
       category: req.params.category 
-    }).populate('farmer', 'name');
+    }).populate('farmer', 'name farmName');
 
     res.json({
       success: true,
@@ -240,7 +243,7 @@ export const getFarmerProducts = async (req, res) => {
   try {
     const products = await Product.find({ 
       farmer: req.params.id 
-    });
+    }).populate('farmer', 'name farmName');
 
     res.json({
       success: true,

@@ -8,6 +8,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
+    "prestart": "rm -rf node_modules/cloudinary && npm install cloudinary",
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
@@ -18,7 +19,7 @@
     "@paypal/checkout-server-sdk": "^1.0.3",
     "axios": "^1.8.4",
     "bcrypt": "^5.1.1",
-    "cloudinary": "^2.6.0",
+    "cloudinary": "^1.40.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

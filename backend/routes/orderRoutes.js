@@ -4,6 +4,7 @@ import {
   getOrderById,
   getUserOrders,
   getOrders,
+  getFarmerOrders,
   updateOrderToPaid,
   updateOrderToDelivered
 } from '../controllers/orderController.js';
@@ -16,6 +17,7 @@ router.route('/')
   .get(protect, adminOnly, getOrders);
 
 router.route('/myorders').get(protect, getUserOrders);
+router.route('/farmer/myorders').get(protect, farmerOnly, getFarmerOrders);
 
 router.route('/:id')
   .get(protect, getOrderById);
@@ -24,6 +26,6 @@ router.route('/:id/pay')
   .put(protect, updateOrderToPaid);
 
 router.route('/:id/deliver')
-  .put(protect, farmerOnly, updateOrderToDelivered);
+  .put(protect, updateOrderToDelivered); // Both admin and farmer can deliver
 
 export default router;

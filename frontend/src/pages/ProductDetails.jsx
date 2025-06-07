@@ -90,7 +90,7 @@ import { addToCart } from '../store/cartSlice';
       quantity: quantity,
       unit: product.unit,
       farmer: product.farmer,
-      farmName: product.farmer?.farmName || 'Local Farm',
+      farmName: product.farmName || 'Local Farm',
       location: product.location
     };
 

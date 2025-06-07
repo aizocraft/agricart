@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { orderAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import LoadingSpinner from '../components/LoadingSpinner';
-import logo from '../assets/react.svg'; // Replace with your actual logo
+import logo from '../assets/logo.png';
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showReceipt, setShowReceipt] = useState(false);
   const { user } = useAuth();
@@ -20,18 +20,30 @@ export default function Orders() {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const { data } = await orderAPI.getMyOrders();
-        setOrders(data);
+        setError(null);
+        let response;
+        
+        if (user.role === 'farmer') {
+          response = await orderAPI.getFarmerOrders();
+        } else {
+          response = await orderAPI.getMyOrders();
+        }
+        
+        // Ensure we always set an array, even if response.data is undefined
+        setOrders(Array.isArray(response?.data?.orders || response?.data) 
+          ? (response.data.orders || response.data) 
+          : []);
       } catch (error) {
-        toast.error('Failed to load orders');
         console.error('Error fetching orders:', error);
+        setError(error.response?.data?.message || 'Failed to load orders');
+        toast.error(error.response?.data?.message || 'Failed to load orders');
       } finally {
         setLoading(false);
       }
     };
 
     fetchOrders();
-  }, []);
+  }, [user.role]);
 
   const handleViewDetails = (order) => {
     navigate(`/orders/${order._id}`);
@@ -40,10 +52,6 @@ export default function Orders() {
   const handlePrintReceipt = (order) => {
     setSelectedOrder(order);
     setShowReceipt(true);
-    setTimeout(() => {
-      window.print();
-      setShowReceipt(false);
-    }, 500);
   };
 
   const formatDate = (dateString) => {
@@ -53,11 +61,17 @@ export default function Orders() {
   };
 
   const getStatusBadge = (order) => {
+    if (order.status === 'Cancelled') {
+      return <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-medium">Cancelled</span>;
+    }
     if (!order.isPaid) {
       return <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-medium">Pending Payment</span>;
     }
-    if (!order.isDelivered) {
+    if (order.status === 'Processing') {
       return <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium">Processing</span>;
+    }
+    if (order.status === 'Shipped') {
+      return <span className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-xs font-medium">Shipped</span>;
     }
     return <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium">Delivered</span>;
   };
@@ -70,6 +84,22 @@ export default function Orders() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-7xl text-center">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+        <button 
+          onClick={() => window.location.reload()}
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <motion.h1 
@@ -78,7 +108,7 @@ export default function Orders() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        My Orders
+        {user.role === 'farmer' ? 'My Farmer Orders' : 'My Orders'}
       </motion.h1>
 
       {orders.length === 0 ? (
@@ -102,7 +132,9 @@ export default function Orders() {
                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
               />
             </svg>
-            <p className="text-lg text-gray-600 mb-6">You haven't placed any orders yet</p>
+            <p className="text-lg text-gray-600 mb-6">
+              {user.role === 'farmer' ? "You don't have any orders yet" : "You haven't placed any orders yet"}
+            </p>
             <motion.button 
               onClick={() => navigate('/products')}
               className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors shadow-md"
@@ -125,6 +157,11 @@ export default function Orders() {
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
                   </th>
+                  {user.role === 'farmer' && (
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Customer
+                    </th>
+                  )}
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Items
                   </th>
@@ -153,11 +190,16 @@ export default function Orders() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(order.createdAt)}
                     </td>
+                    {user.role === 'farmer' && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {order.user?.name || 'N/A'}
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {order.orderItems.length} item{order.orderItems.length !== 1 ? 's' : ''}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      KES {order.totalPrice.toFixed(2)}
+                      KES {order.totalPrice?.toFixed(2) || '0.00'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(order)}
@@ -169,12 +211,14 @@ export default function Orders() {
                       >
                         View
                       </button>
-                      <button
-                        onClick={() => handlePrintReceipt(order)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Receipt
-                      </button>
+                      {user.role !== 'farmer' && (
+                        <button
+                          onClick={() => handlePrintReceipt(order)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          Receipt
+                        </button>
+                      )}
                     </td>
                   </motion.tr>
                 ))}
@@ -224,23 +268,23 @@ export default function Orders() {
                 <div className="mb-4">
                   <h4 className="font-medium mb-2">Customer Details</h4>
                   <p className="text-sm">{user?.name}</p>
-                  <p className="text-sm">{selectedOrder.shippingAddress.address}</p>
+                  <p className="text-sm">{selectedOrder.shippingAddress?.address}</p>
                   <p className="text-sm">
-                    {selectedOrder.shippingAddress.city}, {selectedOrder.shippingAddress.postalCode}
+                    {selectedOrder.shippingAddress?.city}, {selectedOrder.shippingAddress?.postalCode}
                   </p>
-                  <p className="text-sm">{selectedOrder.shippingAddress.country}</p>
+                  <p className="text-sm">{selectedOrder.shippingAddress?.country}</p>
                 </div>
 
                 <div className="border-b pb-4 mb-4">
                   <h4 className="font-medium mb-2">Order Items</h4>
                   <div className="space-y-3">
-                    {selectedOrder.orderItems.map((item, index) => (
+                    {selectedOrder.orderItems?.map((item, index) => (
                       <div key={index} className="flex justify-between text-sm">
                         <div>
                           <p>{item.name}</p>
-                          <p className="text-gray-600">{item.quantity} × KES {item.price.toFixed(2)}</p>
+                          <p className="text-gray-600">{item.quantity} × KES {item.price?.toFixed(2)}</p>
                         </div>
-                        <p className="font-medium">KES {(item.price * item.quantity).toFixed(2)}</p>
+                        <p className="font-medium">KES {(item.price * item.quantity)?.toFixed(2)}</p>
                       </div>
                     ))}
                   </div>
@@ -249,21 +293,21 @@ export default function Orders() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Subtotal:</span>
-                    <span>KES {selectedOrder.itemsPrice.toFixed(2)}</span>
+                    <span>KES {selectedOrder.itemsPrice?.toFixed(2) || '0.00'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Tax (10%):</span>
-                    <span>KES {selectedOrder.taxPrice.toFixed(2)}</span>
+                    <span>KES {selectedOrder.taxPrice?.toFixed(2) || '0.00'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Shipping:</span>
                     <span>
-                      {selectedOrder.shippingPrice === 0 ? 'Free' : `KES ${selectedOrder.shippingPrice.toFixed(2)}`}
+                      {selectedOrder.shippingPrice === 0 ? 'Free' : `KES ${selectedOrder.shippingPrice?.toFixed(2) || '0.00'}`}
                     </span>
                   </div>
                   <div className="flex justify-between font-bold text-base border-t pt-2 mt-2">
                     <span>Total:</span>
-                    <span>KES {selectedOrder.totalPrice.toFixed(2)}</span>
+                    <span>KES {selectedOrder.totalPrice?.toFixed(2) || '0.00'}</span>
                   </div>
                 </div>
 
@@ -279,6 +323,12 @@ export default function Orders() {
                   className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
                 >
                   Close
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="ml-3 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                >
+                  Print Receipt
                 </button>
               </div>
             </motion.div>

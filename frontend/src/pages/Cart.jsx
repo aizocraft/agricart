@@ -34,7 +34,8 @@ export default function Cart() {
     address: '',
     city: '',
     postalCode: '',
-    country: 'Kenya'
+    country: 'Kenya',
+    phone: ''
   });
   const [paymentMethod, setPaymentMethod] = useState(savedPaymentMethod || 'Mpesa');
 
@@ -46,8 +47,11 @@ export default function Cart() {
   useEffect(() => {
     if (!savedShippingAddress && user?.address) {
       setAddress({
-        ...user.address,
-        country: user.address.country || 'Kenya'
+        address: user.address.street || '',
+        city: user.address.city || '',
+        postalCode: user.address.postalCode || '',
+        country: user.address.country || 'Kenya',
+        phone: user.phone || ''
       });
     }
   }, [user, savedShippingAddress]);
@@ -57,11 +61,23 @@ export default function Cart() {
     setAddress(prev => ({ ...prev, [name]: value }));
   };
 
+  const validatePhoneNumber = (phone) => {
+    // Basic validation for Kenyan phone numbers
+    const regex = /^(\+?254|0)[17]\d{8}$/;
+    return regex.test(phone);
+  };
+
   const saveAddress = () => {
-    if (!address.address || !address.city || !address.postalCode) {
+    if (!address.address || !address.city || !address.postalCode || !address.phone) {
       toast.error('Please fill all required fields');
       return;
     }
+
+    if (!validatePhoneNumber(address.phone)) {
+      toast.error('Please enter a valid Kenyan phone number (e.g. 0712345678)');
+      return;
+    }
+
     dispatch(saveShippingAddress(address));
     setShowAddressForm(false);
     toast.success('Shipping address saved');
@@ -114,7 +130,7 @@ export default function Cart() {
       const { data } = await orderAPI.createOrder(orderData);
       dispatch(clearCart());
       toast.success('Order placed successfully!');
-      navigate(`/orders`);
+      navigate(`/orders/${data._id}`);
     } catch (error) {
       console.error('Checkout error:', error);
       const errorMsg = error.response?.data?.message || 
@@ -205,6 +221,31 @@ export default function Cart() {
                 >
                   <h3 className="text-lg font-semibold mb-4">Shipping Address</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number*</label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={address.phone}
+                        onChange={handleAddressChange}
+                        className="w-full px-3 py-2 border rounded-md"
+                        required
+                        placeholder="e.g. 0712345678"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                      <select
+                        name="country"
+                        value={address.country}
+                        onChange={handleAddressChange}
+                        className="w-full px-3 py-2 border rounded-md"
+                      >
+                        <option value="Kenya">Kenya</option>
+                        <option value="Uganda">Uganda</option>
+                        <option value="Tanzania">Tanzania</option>
+                      </select>
+                    </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Address*</label>
                       <input
@@ -237,19 +278,6 @@ export default function Cart() {
                         className="w-full px-3 py-2 border rounded-md"
                         required
                       />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
-                      <select
-                        name="country"
-                        value={address.country}
-                        onChange={handleAddressChange}
-                        className="w-full px-3 py-2 border rounded-md"
-                      >
-                        <option value="Kenya">Kenya</option>
-                        <option value="Uganda">Uganda</option>
-                        <option value="Tanzania">Tanzania</option>
-                      </select>
                     </div>
                   </div>
                   <div className="flex justify-end mt-4 space-x-3">
@@ -448,7 +476,8 @@ export default function Cart() {
                   <h3 className="text-sm font-medium text-gray-600 mb-2">Shipping to</h3>
                   <p className="text-gray-800">
                     {savedShippingAddress.address}, {savedShippingAddress.city}<br />
-                    {savedShippingAddress.postalCode}, {savedShippingAddress.country}
+                    {savedShippingAddress.postalCode}, {savedShippingAddress.country}<br />
+                    Phone: {savedShippingAddress.phone}
                   </p>
                   <button
                     onClick={() => setShowAddressForm(true)}
