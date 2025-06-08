@@ -130,7 +130,14 @@ export default function Cart() {
       const { data } = await orderAPI.createOrder(orderData);
       dispatch(clearCart());
       toast.success('Order placed successfully!');
-      navigate(`/orders/${data._id}`);
+      
+      // Navigate to order details page with the new order data
+      navigate(`/order/${data._id}`, { 
+        state: { 
+          order: data,
+          justCreated: true 
+        } 
+      });
     } catch (error) {
       console.error('Checkout error:', error);
       const errorMsg = error.response?.data?.message || 
@@ -146,6 +153,9 @@ export default function Cart() {
         error.response.data.outOfStockItems.forEach(item => {
           dispatch(removeFromCart(item.product));
         });
+      } else if (error.response?.status === 400 && error.response.data?.message?.includes('stock')) {
+        // Handle stock validation errors
+        toast.error('Some items in your cart are no longer available in the requested quantities. Please update your cart.');
       } else {
         toast.error(errorMsg);
       }

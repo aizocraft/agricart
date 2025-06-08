@@ -186,21 +186,26 @@ export const productAPI = {
 export const orderAPI = {
   createOrder: (orderData) => API.post("/orders", orderData),
   getMyOrders: () => cachedGet("/orders/myorders"),
-  getFarmerOrders: () => cachedGet("/orders/farmer/myorders"), 
+  getFarmerOrders: () => cachedGet("/orders/farmer/myorders"),
   getAllOrders: () => cachedGet("/orders"),
   getOrderById: (id) => cachedGet(`/orders/${id}`),
   updateOrderToPaid: (id, paymentResult) => 
     API.put(`/orders/${id}/pay`, paymentResult),
   updateOrderToDelivered: (id) => 
     API.put(`/orders/${id}/deliver`),
+  cancelOrder: (id, cancellationData = {}) => 
+    API.put(`/orders/${id}/cancel`, cancellationData),
 
   // Real-time updates (for Socket.io)
   listenForOrderUpdates: (callback) => {
     socket.on("newOrder", callback);
     return () => socket.off("newOrder", callback);
   },
+  listenForOrderCancellations: (callback) => {
+    socket.on("orderCancelled", callback);
+    return () => socket.off("orderCancelled", callback);
+  },
 };
-
 // Admin API
 export const adminAPI = {
   getStats: () => cachedGet("/admin/stats"),

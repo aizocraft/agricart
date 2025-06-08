@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import User from '../models/User.js';
@@ -25,7 +26,7 @@ const createOrder = async (req, res) => {
       });
     }
 
-    // Validate product existence and stock
+    // Validate product existence
     const products = await Product.find({ 
       _id: { $in: orderItems.map(item => item.product) } 
     }).populate('farmer', 'name phone farmName');
@@ -41,7 +42,7 @@ const createOrder = async (req, res) => {
       });
     }
 
-    // Check stock availability
+    // Check stock availability (but don't deduct yet)
     const outOfStockItems = orderItems.filter(item => {
       const product = products.find(p => p._id.equals(item.product));
       return product.stock < item.quantity;
@@ -84,26 +85,10 @@ const createOrder = async (req, res) => {
       taxPrice,
       shippingPrice,
       totalPrice,
+      inventoryUpdated: false // Inventory will be updated when paid
     });
 
     const createdOrder = await order.save();
-
-    // Update product stock
-    await Promise.all(orderItems.map(async (item) => {
-      const product = await Product.findById(item.product);
-      product.stock -= item.quantity;
-      await product.save();
-      
-      // Notify farmer if socket.io is available
-      if (req.io && product.farmer) {
-        req.io.to(product.farmer.toString()).emit('newOrder', {
-          orderId: createdOrder._id,
-          productId: product._id,
-          quantity: item.quantity,
-          buyerName: req.user.name
-        });
-      }
-    }));
 
     res.status(201).json({
       success: true,
@@ -285,10 +270,15 @@ const getFarmerOrders = async (req, res) => {
 // @route   PUT /api/orders/:id/pay
 // @access  Private
 const updateOrderToPaid = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findById(req.params.id).session(session);
 
     if (!order) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ 
         success: false,
         message: 'Order not found' 
@@ -297,15 +287,71 @@ const updateOrderToPaid = async (req, res) => {
 
     // Verify user is owner or admin
     if (!order.user.equals(req.user._id) && req.user.role !== 'admin') {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(401).json({ 
         success: false,
         message: 'Not authorized to update this order' 
       });
     }
 
+    // If order is already paid, return without changes
+    if (order.isPaid) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ 
+        success: false,
+        message: 'Order is already paid' 
+      });
+    }
+
+    // Check stock availability before proceeding with payment
+    const products = await Product.find({
+      _id: { $in: order.orderItems.map(item => item.product) }
+    }).session(session);
+
+    const outOfStockItems = order.orderItems.filter(item => {
+      const product = products.find(p => p._id.equals(item.product));
+      return product.stock < item.quantity;
+    });
+
+    if (outOfStockItems.length > 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot complete payment - some products are now out of stock',
+        outOfStockItems: outOfStockItems.map(item => ({
+          product: item.product,
+          name: products.find(p => p._id.equals(item.product)).name,
+          requested: item.quantity,
+          available: products.find(p => p._id.equals(item.product)).stock
+        }))
+      });
+    }
+
+    // Update inventory
+    await Promise.all(order.orderItems.map(async (item) => {
+      const product = await Product.findById(item.product).session(session);
+      product.stock -= item.quantity;
+      await product.save({ session });
+      
+      // Notify farmer
+      if (req.io && product.farmer) {
+        req.io.to(product.farmer.toString()).emit('newOrder', {
+          orderId: order._id,
+          productId: product._id,
+          quantity: item.quantity,
+          buyerName: req.user.name
+        });
+      }
+    }));
+
+    // Update order status
     order.isPaid = true;
     order.paidAt = Date.now();
     order.status = 'Processing';
+    order.inventoryUpdated = true;
     order.paymentResult = {
       id: req.body.id,
       status: req.body.status,
@@ -314,17 +360,25 @@ const updateOrderToPaid = async (req, res) => {
       phone: req.body.payer?.phone_number || req.user.phone
     };
 
-    const updatedOrder = await order.save();
+    const updatedOrder = await order.save({ session });
+    await session.commitTransaction();
+    session.endSession();
 
     res.json({
       success: true,
       order: updatedOrder,
       message: 'Order payment updated successfully'
     });
+
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    
+    console.error('Payment update error:', error);
     res.status(500).json({ 
       success: false,
-      message: error.message || 'Error updating order payment' 
+      message: error.message || 'Error updating order payment',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -395,6 +449,117 @@ const updateOrderToDelivered = async (req, res) => {
   }
 };
 
+// @desc    Cancel order
+// @route   PUT /api/orders/:id/cancel
+// @access  Private
+const cancelOrder = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
+  try {
+    const order = await Order.findById(req.params.id).session(session);
+
+    if (!order) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ 
+        success: false,
+        message: 'Order not found' 
+      });
+    }
+
+    // Authorization - only buyer or admin can cancel
+    if (!order.user.equals(req.user._id)) {
+      if (req.user.role !== 'admin') {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(401).json({ 
+          success: false,
+          message: 'Not authorized to cancel this order' 
+        });
+      }
+    }
+
+    // Check if order can be cancelled
+    if (order.status === 'Delivered') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ 
+        success: false,
+        message: 'Cannot cancel already delivered order' 
+      });
+    }
+
+    if (order.status === 'Cancelled') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ 
+        success: false,
+        message: 'Order is already cancelled' 
+      });
+    }
+
+    // Update order status
+    order.status = 'Cancelled';
+    order.cancelledAt = Date.now();
+    order.cancelledBy = req.user._id;
+    
+    // Only restore stock if inventory was previously updated (order was paid)
+    if (order.inventoryUpdated) {
+      await Promise.all(order.orderItems.map(async (item) => {
+        const product = await Product.findById(item.product).session(session);
+        if (product) {
+          product.stock += item.quantity;
+          await product.save({ session });
+        }
+      }));
+    }
+
+    const updatedOrder = await order.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Notify relevant parties
+    if (req.io) {
+      // Notify buyer
+      req.io.to(order.user.toString()).emit('orderCancelled', {
+        orderId: order._id,
+        cancelledAt: order.cancelledAt
+      });
+
+      // Notify farmers
+      const farmerIds = [...new Set(
+        order.orderItems.map(item => item.product.farmer?.toString()).filter(Boolean)
+      )];
+      farmerIds.forEach(farmerId => {
+        req.io.to(farmerId).emit('farmerOrderCancelled', {
+          orderId: order._id,
+          cancelledBy: req.user.name,
+          cancelledAt: order.cancelledAt
+        });
+      });
+    }
+
+    res.json({
+      success: true,
+      order: updatedOrder,
+      message: 'Order cancelled successfully'
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    
+    console.error('Order cancellation error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error cancelling order',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 export {
   createOrder,
   getOrderById,
@@ -402,5 +567,6 @@ export {
   getOrders,
   getFarmerOrders,
   updateOrderToPaid,
-  updateOrderToDelivered
+  updateOrderToDelivered,
+  cancelOrder
 };

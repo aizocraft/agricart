@@ -6,7 +6,8 @@ import {
   getOrders,
   getFarmerOrders,
   updateOrderToPaid,
-  updateOrderToDelivered
+  updateOrderToDelivered,
+  cancelOrder
 } from '../controllers/orderController.js';
 import { protect, adminOnly, farmerOnly } from '../middleware/authMiddleware.js';
 
@@ -27,5 +28,8 @@ router.route('/:id/pay')
 
 router.route('/:id/deliver')
   .put(protect, updateOrderToDelivered); // Both admin and farmer can deliver
+
+router.route('/:id/cancel')
+  .put(protect, cancelOrder); // Buyer or admin can cancel
 
 export default router;

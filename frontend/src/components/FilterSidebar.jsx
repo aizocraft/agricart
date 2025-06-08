@@ -1,34 +1,48 @@
-import { useState } from 'react'; // Add this import at the top
+import { useState, useEffect } from 'react';
 
 const FilterSidebar = ({
-  categories,
-  filters,
+  categories = [],
+  locations = [],
+  filters = {},
   onChange,
   onReset,
-  sortOptions,
-  mobile = false
+  sortOptions = [],
+  mobile = false,
 }) => {
+  // Local state for price inputs (controlled inputs separate from global filters)
   const [priceRange, setPriceRange] = useState({
     min: filters.minPrice || '',
-    max: filters.maxPrice || ''
+    max: filters.maxPrice || '',
   });
 
+  // Sync local priceRange state with filters prop changes
+  useEffect(() => {
+    setPriceRange({
+      min: filters.minPrice || '',
+      max: filters.maxPrice || '',
+    });
+  }, [filters.minPrice, filters.maxPrice]);
+
+  // Handle typing in price inputs locally
   const handlePriceChange = (e) => {
     const { name, value } = e.target;
-    setPriceRange(prev => ({
+    setPriceRange((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
+  // Apply price filter only when button clicked (to avoid firing on every keystroke)
   const applyPriceFilter = () => {
-    onChange('minPrice', priceRange.min);
-    onChange('maxPrice', priceRange.max);
+    // Convert empty strings to undefined or '' so filter clears properly
+    onChange('minPrice', priceRange.min === '' ? '' : priceRange.min);
+    onChange('maxPrice', priceRange.max === '' ? '' : priceRange.max);
   };
 
   return (
     <div className={`${mobile ? '' : 'sticky top-4'}`}>
       <div className="bg-white p-4 rounded-lg shadow">
+        {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium">Filters</h3>
           <button
@@ -41,14 +55,17 @@ const FilterSidebar = ({
 
         {/* Search */}
         <div className="mb-6">
-          <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            htmlFor="search"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
             Search
           </label>
           <input
             type="text"
             id="search"
             name="keyword"
-            value={filters.keyword}
+            value={filters.keyword || ''}
             onChange={(e) => onChange('keyword', e.target.value)}
             placeholder="Product name..."
             className="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
@@ -57,7 +74,9 @@ const FilterSidebar = ({
 
         {/* Categories */}
         <div className="mb-6">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Categories</h4>
+          <h4 className="text-sm font-medium text-gray-700 mb-2">
+            Categories
+          </h4>
           <div className="space-y-2">
             <div className="flex items-center">
               <input
@@ -68,7 +87,10 @@ const FilterSidebar = ({
                 checked={!filters.category}
                 onChange={() => onChange('category', '')}
               />
-              <label htmlFor="category-all" className="ml-3 text-sm text-gray-600">
+              <label
+                htmlFor="category-all"
+                className="ml-3 text-sm text-gray-600"
+              >
                 All Categories
               </label>
             </div>
@@ -82,7 +104,10 @@ const FilterSidebar = ({
                   checked={filters.category === category}
                   onChange={() => onChange('category', category)}
                 />
-                <label htmlFor={`category-${category}`} className="ml-3 text-sm text-gray-600">
+                <label
+                  htmlFor={`category-${category}`}
+                  className="ml-3 text-sm text-gray-600"
+                >
                   {category}
                 </label>
               </div>
@@ -90,12 +115,33 @@ const FilterSidebar = ({
           </div>
         </div>
 
+        {/* Location */}
+        <div className="mb-6">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">Location</h4>
+          <select
+            value={filters.location || ''}
+            onChange={(e) => onChange('location', e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+          >
+            <option value="">All Locations</option>
+            {locations.map((loc) => (
+              <option key={loc} value={loc}>
+                {loc}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Price Range */}
         <div className="mb-6">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Price Range</h4>
+          <h4 className="text-sm font-medium text-gray-700 mb-2">
+            Price Range
+          </h4>
           <div className="grid grid-cols-2 gap-3 mb-2">
             <div>
-              <label htmlFor="minPrice" className="sr-only">Min</label>
+              <label htmlFor="minPrice" className="sr-only">
+                Min
+              </label>
               <input
                 type="number"
                 id="minPrice"
@@ -108,7 +154,9 @@ const FilterSidebar = ({
               />
             </div>
             <div>
-              <label htmlFor="maxPrice" className="sr-only">Max</label>
+              <label htmlFor="maxPrice" className="sr-only">
+                Max
+              </label>
               <input
                 type="number"
                 id="maxPrice"
@@ -137,10 +185,13 @@ const FilterSidebar = ({
               name="organic"
               type="checkbox"
               className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-              checked={filters.organic}
+              checked={filters.organic || false}
               onChange={(e) => onChange('organic', e.target.checked)}
             />
-            <label htmlFor="organic" className="ml-3 text-sm text-gray-600">
+            <label
+              htmlFor="organic"
+              className="ml-3 text-sm text-gray-600"
+            >
               Organic Only
             </label>
           </div>
@@ -150,7 +201,7 @@ const FilterSidebar = ({
         <div>
           <h4 className="text-sm font-medium text-gray-700 mb-2">Sort By</h4>
           <select
-            value={filters.sort}
+            value={filters.sort || ''}
             onChange={(e) => onChange('sort', e.target.value)}
             className="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
           >

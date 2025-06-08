@@ -160,9 +160,8 @@ export default function OrderDetails() {
     if (!window.confirm('Are you sure you want to cancel this order?')) return;
     
     try {
-      // Here you would call your API to cancel the order
-      // Example: await orderAPI.cancelOrder(order._id);
-      setOrder(prev => ({ ...prev, status: 'Cancelled' }));
+      const response = await orderAPI.cancelOrder(order._id);
+      setOrder(response.data);
       toast.success('Order cancelled successfully');
     } catch (error) {
       console.error('Error cancelling order:', error);

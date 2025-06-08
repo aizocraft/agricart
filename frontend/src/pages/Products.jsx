@@ -24,15 +24,15 @@ const categories = [
 ];
 
 const locations = [
-  'North',
-  'South',
-  'East',
-  'West',
-  'Central',
-  'Coastal',
-  'Mountain',
-  'Urban',
-  'Rural'
+  'Nyeri, Kenya',
+  'Embu, Kenya',
+  'Kiambu, Kenya',
+  'Mombasa, Kenya',
+  'Nairobi, Kenya',
+  'Kisumu, Kenya',
+  'Eldoret, Kenya',
+  'Thika, Kenya',
+  'Nakuru, Kenya'
 ];
 
 const sortOptions = [
