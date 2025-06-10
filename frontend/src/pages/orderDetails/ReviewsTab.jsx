@@ -1,5 +1,7 @@
-import logo from '../../assets/logo.png';
+import { useState } from 'react';
+import { toast } from 'react-hot-toast';
 import StarRating from '../../components/StarRating';
+import logo from '../../assets/logo.png';
 
 export default function ReviewsTab({ order, reviews, handleReviewChange, submitReview }) {
   return (
@@ -18,9 +20,7 @@ export default function ReviewsTab({ order, reviews, handleReviewChange, submitR
                 }}
               />
               <div className="flex-grow">
-                <h4 className="font-medium text-gray-800">
-                  {item.name || 'Unnamed Product'}
-                </h4>
+                <h4 className="font-medium text-gray-800">{item.name || 'Unnamed Product'}</h4>
                 {!reviews[item.product?._id]?.submitted ? (
                   <div className="mt-3">
                     <div className="mb-3">
@@ -28,16 +28,11 @@ export default function ReviewsTab({ order, reviews, handleReviewChange, submitR
                       <StarRating
                         rating={reviews[item.product?._id]?.rating || 0}
                         editable={true}
-                        onRatingChange={(rating) => 
-                          handleReviewChange(item.product._id, 'rating', rating)
-                        }
+                        onRatingChange={(rating) => handleReviewChange(item.product._id, 'rating', rating)}
                       />
                     </div>
                     <div className="mb-3">
-                      <label 
-                        htmlFor={`comment-${item.product?._id}`} 
-                        className="block text-sm text-gray-600 mb-1"
-                      >
+                      <label htmlFor={`comment-${item.product?._id}`} className="block text-sm text-gray-600 mb-1">
                         Review
                       </label>
                       <textarea
@@ -45,9 +40,7 @@ export default function ReviewsTab({ order, reviews, handleReviewChange, submitR
                         rows="3"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
                         value={reviews[item.product?._id]?.comment || ''}
-                        onChange={(e) => 
-                          handleReviewChange(item.product._id, 'comment', e.target.value)
-                        }
+                        onChange={(e) => handleReviewChange(item.product._id, 'comment', e.target.value)}
                         placeholder="Share your experience with this product..."
                       />
                     </div>
@@ -62,13 +55,9 @@ export default function ReviewsTab({ order, reviews, handleReviewChange, submitR
                   <div className="mt-2">
                     <StarRating rating={reviews[item.product._id].rating} />
                     {reviews[item.product._id].comment && (
-                      <p className="mt-2 text-gray-600">
-                        {reviews[item.product._id].comment}
-                      </p>
+                      <p className="mt-2 text-gray-600">{reviews[item.product._id].comment}</p>
                     )}
-                    <p className="text-sm text-green-600 mt-2">
-                      Thank you for your review!
-                    </p>
+                    <p className="text-sm text-green-600 mt-2">Thank you for your review!</p>
                   </div>
                 )}
               </div>

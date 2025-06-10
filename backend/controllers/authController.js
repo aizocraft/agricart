@@ -2,10 +2,17 @@ import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
 import asyncHandler from 'express-async-handler';
 
-// Generate JWT token
+// Generate Access Token
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { 
-    expiresIn: '30d' 
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: '30d',
+  });
+};
+
+// Generate Refresh Token
+const generateRefreshToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_REFRESH_SECRET, {
+    expiresIn: '7d',
   });
 };
 
@@ -15,20 +22,17 @@ const generateToken = (id) => {
 export const register = asyncHandler(async (req, res) => {
   const { name, email, password, role, farmName, location, phone } = req.body;
 
-  // Basic validation
   if (!name || !email || !password) {
     res.status(400);
     throw new Error('Please include all required fields');
   }
 
-  // Check if user exists
   const userExists = await User.findOne({ email });
   if (userExists) {
     res.status(400);
     throw new Error('User already exists');
   }
 
-  // Additional validation for farmers
   if (role === 'farmer') {
     if (!farmName || !location) {
       res.status(400);
@@ -36,29 +40,28 @@ export const register = asyncHandler(async (req, res) => {
     }
   }
 
-  // Create user object based on role
   const userData = {
     name,
     email,
     password,
-    role: role || 'buyer'
+    role: role || 'buyer',
   };
 
-  // Add farmer-specific fields if role is farmer
   if (role === 'farmer') {
     userData.farmName = farmName;
     userData.location = location;
     if (phone) userData.phone = phone;
   }
 
-  // Create user
   const user = await User.create(userData);
 
   if (user) {
     const token = generateToken(user._id);
-    
+    const refreshToken = generateRefreshToken(user._id);
+
     res.status(201).json({
       token,
+      refreshToken,
       user: {
         _id: user._id,
         name: user.name,
@@ -67,8 +70,8 @@ export const register = asyncHandler(async (req, res) => {
         farmName: user.farmName,
         location: user.location,
         phone: user.phone,
-        avatar: user.avatar
-      }
+        avatar: user.avatar,
+      },
     });
   } else {
     res.status(400);
@@ -82,32 +85,24 @@ export const register = asyncHandler(async (req, res) => {
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  // Validate request
   if (!email || !password) {
     res.status(400);
     throw new Error('Please include email and password');
   }
 
-  // Check for user and include password field
   const user = await User.findOne({ email }).select('+password');
 
-  if (!user) {
+  if (!user || !(await user.matchPassword(password))) {
     res.status(401);
     throw new Error('Invalid credentials');
   }
 
-  // Verify password
-  const isMatch = await user.matchPassword(password);
-  if (!isMatch) {
-    res.status(401);
-    throw new Error('Invalid credentials');
-  }
-
-  // Generate token
   const token = generateToken(user._id);
+  const refreshToken = generateRefreshToken(user._id);
 
   res.json({
     token,
+    refreshToken,
     user: {
       _id: user._id,
       name: user.name,
@@ -116,8 +111,8 @@ export const login = asyncHandler(async (req, res) => {
       farmName: user.farmName,
       location: user.location,
       phone: user.phone,
-      avatar: user.avatar
-    }
+      avatar: user.avatar,
+    },
   });
 });
 
@@ -141,7 +136,29 @@ export const getMe = asyncHandler(async (req, res) => {
       farmName: user.farmName,
       location: user.location,
       phone: user.phone,
-      avatar: user.avatar
-    }
+      avatar: user.avatar,
+    },
   });
+});
+
+// @desc    Refresh token
+// @route   POST /api/auth/refresh
+// @access  Public
+export const refreshToken = asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    res.status(401);
+    throw new Error('Refresh token is missing');
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const accessToken = generateToken(decoded.id);
+
+    res.json({ accessToken });
+  } catch (error) {
+    res.status(403);
+    throw new Error('Invalid or expired refresh token');
+  }
 });

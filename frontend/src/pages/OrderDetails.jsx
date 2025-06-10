@@ -5,8 +5,12 @@ import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoadingSpinner from '../components/LoadingSpinner';
-import StarRating from '../components/StarRating';
-import logo from '../assets/logo.png';
+import OrderHeader from './orderDetails/OrderHeader';
+import StatusStepper from './orderDetails/StatusStepper';
+import OrderItemsTab from './orderDetails/OrderItemsTab';
+import ShippingPaymentTab from './orderDetails/ShippingPaymentTab';
+import ReviewsTab from './orderDetails/ReviewsTab';
+import ReceiptModal from './orderDetails/ReceiptModal';
 
 export default function OrderDetails() {
   const { id } = useParams();
@@ -26,10 +30,7 @@ export default function OrderDetails() {
         setLoading(true);
         setError(null);
         
-        // Make API call to get order details
         const response = await orderAPI.getOrderById(id);
-        
-        // Handle different response structures
         const orderData = response.data?.order || response.data;
         
         if (!orderData) {
@@ -38,7 +39,6 @@ export default function OrderDetails() {
 
         setOrder(orderData);
         
-        // Initialize reviews state for each product
         const initialReviews = {};
         if (orderData.orderItems && Array.isArray(orderData.orderItems)) {
           orderData.orderItems.forEach(item => {
@@ -60,7 +60,6 @@ export default function OrderDetails() {
         setError(errorMessage);
         toast.error(errorMessage);
         
-        // Redirect if order not found
         if (err.response?.status === 404) {
           navigate('/orders', { replace: true });
         }
@@ -94,7 +93,6 @@ export default function OrderDetails() {
       // Example: await productAPI.createReview(productId, review);
       toast.success('Review submitted successfully!');
       
-      // Update UI to show review was submitted
       setReviews(prev => ({
         ...prev,
         [productId]: {
@@ -106,54 +104,6 @@ export default function OrderDetails() {
       console.error('Error submitting review:', error);
       toast.error(error.response?.data?.message || 'Failed to submit review');
     }
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    try {
-      const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-      return new Date(dateString).toLocaleDateString(undefined, options);
-    } catch (e) {
-      console.error('Error formatting date:', e);
-      return 'Invalid date';
-    }
-  };
-
-  const getStatusSteps = () => {
-    if (!order) return [];
-    
-    const steps = [
-      { 
-        id: 'ordered', 
-        name: 'Order Placed', 
-        description: 'Your order has been received', 
-        date: order.createdAt,
-        completed: true
-      },
-      { 
-        id: 'paid', 
-        name: 'Payment', 
-        description: order.isPaid ? 'Payment completed' : 'Awaiting payment', 
-        date: order.paidAt,
-        completed: order.isPaid
-      },
-      { 
-        id: 'processed', 
-        name: 'Processing', 
-        description: order.isPaid ? 'Preparing your order' : 'Will start after payment', 
-        date: order.isPaid ? new Date(order.createdAt).setHours(new Date(order.createdAt).getHours() + 1) : null,
-        completed: order.isPaid
-      },
-      { 
-        id: 'delivered', 
-        name: 'Delivered', 
-        description: order.isDelivered ? 'Order delivered' : 'On the way', 
-        date: order.deliveredAt,
-        completed: order.isDelivered
-      }
-    ];
-
-    return steps;
   };
 
   const cancelOrder = async () => {
@@ -216,84 +166,15 @@ export default function OrderDetails() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3 }}
       >
-        {/* Order Header */}
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              Order #{order._id?.substring(0, 8) || 'N/A'}
-            </h1>
-            <p className="text-gray-600">
-              Placed on {formatDate(order.createdAt)}
-              {order.status === 'Cancelled' && (
-                <span className="ml-2 bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs">
-                  Cancelled
-                </span>
-              )}
-            </p>
-          </div>
-          <div className="mt-4 md:mt-0 flex space-x-3">
-            <button
-              onClick={() => setShowReceipt(true)}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              View Receipt
-            </button>
-            {!order.isPaid && user?.role !== 'farmer' && order.status !== 'Cancelled' && (
-              <button
-                onClick={cancelOrder}
-                className="px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors"
-              >
-                Cancel Order
-              </button>
-            )}
-          </div>
-        </div>
+        <OrderHeader 
+          order={order} 
+          user={user} 
+          showReceipt={showReceipt} 
+          setShowReceipt={setShowReceipt} 
+          cancelOrder={cancelOrder} 
+        />
 
-        {/* Order Status Stepper */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-          <h2 className="text-lg font-semibold mb-6">Order Status</h2>
-          <div className="relative">
-            <div className="absolute top-0 left-4 h-full w-0.5 bg-gray-200" aria-hidden="true"></div>
-            <ul className="space-y-8">
-              {getStatusSteps().map((step, stepIdx) => (
-                <motion.li 
-                  key={step.id}
-                  className="relative"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: stepIdx * 0.1 }}
-                >
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <div className={`flex items-center justify-center h-8 w-8 rounded-full ${step.completed ? 'bg-green-500' : 'bg-gray-300'}`}>
-                        {step.completed ? (
-                          <svg className="h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        ) : (
-                          <span className="text-white">{stepIdx + 1}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="ml-4">
-                      <h3 className={`text-sm font-medium ${step.completed ? 'text-green-600' : 'text-gray-500'}`}>
-                        {step.name}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {step.description}
-                      </p>
-                      {step.date && (
-                        <p className="text-xs text-gray-400 mt-1">
-                          {formatDate(step.date)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </motion.li>
-              ))}
-            </ul>
-          </div>
-        </div>
+        <StatusStepper order={order} />
 
         {/* Tabs Navigation */}
         <div className="border-b border-gray-200 mb-6">
@@ -331,177 +212,15 @@ export default function OrderDetails() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-              {activeTab === 'items' && (
-                <div className="divide-y divide-gray-200">
-                  {order.orderItems?.map((item) => (
-                    <div key={item._id || item.product?._id} className="p-6 flex flex-col sm:flex-row">
-                      <div className="flex-shrink-0">
-                        <img
-                          src={item.image || logo}
-                          alt={item.name || 'Product image'}
-                          className="w-20 h-20 object-cover rounded-lg"
-                          onError={(e) => {
-                            e.target.src = logo;
-                          }}
-                        />
-                      </div>
-                      <div className="mt-4 sm:mt-0 sm:ml-6 flex-grow">
-                        <div className="flex justify-between">
-                          <div>
-                            <h3 className="text-lg font-medium text-gray-800">
-                              {item.name || 'Unnamed Product'}
-                            </h3>
-                            <p className="text-sm text-gray-500">
-                              {item.quantity || 0} × KES {item.price?.toFixed(2) || '0.00'}
-                            </p>
-                            {item.product?.organic && (
-                              <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded mt-1">
-                                Organic
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-lg font-medium text-gray-900">
-                            KES {((item.price || 0) * (item.quantity || 0)).toFixed(2)}
-                          </p>
-                        </div>
-                        {order.isDelivered && reviews[item.product?._id]?.submitted && (
-                          <div className="mt-2 flex items-center">
-                            <StarRating rating={reviews[item.product._id].rating} />
-                            <span className="ml-2 text-sm text-gray-500">Your review</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {activeTab === 'shipping' && (
-                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Shipping Address</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-gray-800">{order.shippingAddress?.address || 'N/A'}</p>
-                      <p className="text-gray-800">
-                        {order.shippingAddress?.city || 'N/A'}, {order.shippingAddress?.postalCode || 'N/A'}
-                      </p>
-                      <p className="text-gray-800">{order.shippingAddress?.country || 'N/A'}</p>
-                      {order.shippingAddress?.phone && (
-                        <p className="text-gray-800 mt-2">Phone: {order.shippingAddress.phone}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Payment Method</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-gray-800 capitalize">
-                        {order.paymentMethod ? order.paymentMethod.toLowerCase() : 'N/A'}
-                      </p>
-                      <p className={`mt-2 ${order.isPaid ? 'text-green-600' : 'text-yellow-600'}`}>
-                        {order.isPaid ? `Paid on ${formatDate(order.paidAt)}` : 'Not Paid'}
-                      </p>
-                      {order.isPaid && order.paymentResult && (
-                        <div className="mt-2 text-sm">
-                          <p className="text-gray-500">
-                            Transaction ID: {order.paymentResult.id || 'N/A'}
-                          </p>
-                          {order.paymentResult.status && (
-                            <p className="text-gray-500">
-                              Status: {order.paymentResult.status}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="md:col-span-2">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Order Summary</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Subtotal</span>
-                        <span className="font-medium">KES {order.itemsPrice?.toFixed(2) || '0.00'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Tax (10%)</span>
-                        <span className="font-medium">KES {order.taxPrice?.toFixed(2) || '0.00'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Shipping</span>
-                        <span className="font-medium">
-                          {order.shippingPrice === 0 ? 'Free' : `KES ${order.shippingPrice?.toFixed(2) || '0.00'}`}
-                        </span>
-                      </div>
-                      <div className="border-t pt-2 mt-2 flex justify-between font-bold">
-                        <span>Total</span>
-                        <span>KES {order.totalPrice?.toFixed(2) || '0.00'}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
+              {activeTab === 'items' && <OrderItemsTab order={order} reviews={reviews} />}
+              {activeTab === 'shipping' && <ShippingPaymentTab order={order} />}
               {activeTab === 'review' && (
-                <div className="p-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-6">Rate Your Products</h3>
-                  <div className="space-y-8">
-                    {order.orderItems?.map((item) => (
-                      <div key={item._id || item.product?._id} className="border-b pb-6 last:border-b-0 last:pb-0">
-                        <div className="flex">
-                          <img
-                            src={item.image || logo}
-                            alt={item.name || 'Product image'}
-                            className="w-16 h-16 object-cover rounded-lg mr-4"
-                            onError={(e) => {
-                              e.target.src = logo;
-                            }}
-                          />
-                          <div className="flex-grow">
-                            <h4 className="font-medium text-gray-800">{item.name || 'Unnamed Product'}</h4>
-                            {!reviews[item.product?._id]?.submitted ? (
-                              <div className="mt-3">
-                                <div className="mb-3">
-                                  <p className="text-sm text-gray-600 mb-1">Rating</p>
-                                  <StarRating
-                                    rating={reviews[item.product?._id]?.rating || 0}
-                                    editable={true}
-                                    onRatingChange={(rating) => handleReviewChange(item.product._id, 'rating', rating)}
-                                  />
-                                </div>
-                                <div className="mb-3">
-                                  <label htmlFor={`comment-${item.product?._id}`} className="block text-sm text-gray-600 mb-1">
-                                    Review
-                                  </label>
-                                  <textarea
-                                    id={`comment-${item.product?._id}`}
-                                    rows="3"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                                    value={reviews[item.product?._id]?.comment || ''}
-                                    onChange={(e) => handleReviewChange(item.product._id, 'comment', e.target.value)}
-                                    placeholder="Share your experience with this product..."
-                                  />
-                                </div>
-                                <button
-                                  onClick={() => submitReview(item.product._id)}
-                                  className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
-                                >
-                                  Submit Review
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="mt-2">
-                                <StarRating rating={reviews[item.product._id].rating} />
-                                {reviews[item.product._id].comment && (
-                                  <p className="mt-2 text-gray-600">{reviews[item.product._id].comment}</p>
-                                )}
-                                <p className="text-sm text-green-600 mt-2">Thank you for your review!</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <ReviewsTab 
+                  order={order} 
+                  reviews={reviews} 
+                  handleReviewChange={handleReviewChange} 
+                  submitReview={submitReview} 
+                />
               )}
             </motion.div>
           </AnimatePresence>
@@ -519,119 +238,12 @@ export default function OrderDetails() {
         </div>
       </motion.div>
 
-      {/* Receipt Modal */}
-      <AnimatePresence>
-        {showReceipt && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <motion.div 
-              className="bg-white rounded-lg w-full max-w-md p-6"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-            >
-              <div className="print-only">
-                <div className="text-center mb-6">
-                  <img src={logo} alt="Company Logo" className="h-16 mx-auto mb-2" />
-                  <h2 className="text-xl font-bold">Agricart</h2>
-                  <p className="text-sm text-gray-600">123 Farm Road, Nairobi</p>
-                  <p className="text-sm text-gray-600">Phone: +254 700 123456</p>
-                </div>
-
-                <div className="border-b pb-4 mb-4">
-                  <h3 className="text-lg font-semibold">Order Receipt</h3>
-                  <div className="flex justify-between text-sm mt-2">
-                    <span className="text-gray-600">Order #:</span>
-                    <span>#{order._id?.substring(0, 8) || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Date:</span>
-                    <span>{formatDate(order.createdAt)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Status:</span>
-                    <span>
-                      {order.isPaid ? 'Paid' : 'Pending'} • 
-                      {order.isDelivered ? ' Delivered' : ' Processing'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  <h4 className="font-medium mb-2">Customer Details</h4>
-                  <p className="text-sm">{user?.name || 'N/A'}</p>
-                  <p className="text-sm">{order.shippingAddress?.address || 'N/A'}</p>
-                  <p className="text-sm">
-                    {order.shippingAddress?.city || 'N/A'}, {order.shippingAddress?.postalCode || 'N/A'}
-                  </p>
-                  <p className="text-sm">{order.shippingAddress?.country || 'N/A'}</p>
-                  {order.shippingAddress?.phone && (
-                    <p className="text-sm">Phone: {order.shippingAddress.phone}</p>
-                  )}
-                </div>
-
-                <div className="border-b pb-4 mb-4">
-                  <h4 className="font-medium mb-2">Order Items</h4>
-                  <div className="space-y-3">
-                    {order.orderItems?.map((item, index) => (
-                      <div key={index} className="flex justify-between text-sm">
-                        <div>
-                          <p>{item.name || 'Unnamed Product'}</p>
-                          <p className="text-gray-600">{item.quantity || 0} × KES {item.price?.toFixed(2) || '0.00'}</p>
-                          {item.product?.organic && (
-                            <span className="text-xs text-green-600">Organic</span>
-                          )}
-                        </div>
-                        <p className="font-medium">KES {((item.price || 0) * (item.quantity || 0)).toFixed(2)}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>KES {order.itemsPrice?.toFixed(2) || '0.00'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Tax (10%):</span>
-                    <span>KES {order.taxPrice?.toFixed(2) || '0.00'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Shipping:</span>
-                    <span>
-                      {order.shippingPrice === 0 ? 'Free' : `KES ${order.shippingPrice?.toFixed(2) || '0.00'}`}
-                    </span>
-                  </div>
-                  <div className="flex justify-between font-bold text-base border-t pt-2 mt-2">
-                    <span>Total:</span>
-                    <span>KES {order.totalPrice?.toFixed(2) || '0.00'}</span>
-                  </div>
-                </div>
-
-                <div className="mt-6 pt-4 border-t text-center text-xs text-gray-500">
-                  <p>Thank you for shopping with us!</p>
-                  <p>For any inquiries, contact support@agricart.com</p>
-                </div>
-              </div>
-
-              <div className="flex justify-end mt-6 print:hidden">
-                <button
-                  onClick={() => setShowReceipt(false)}
-                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
-                >
-                  Close
-                </button>
-                <button
-                  onClick={() => window.print()}
-                  className="ml-3 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-                >
-                  Print Receipt
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <ReceiptModal 
+        showReceipt={showReceipt} 
+        setShowReceipt={setShowReceipt} 
+        order={order} 
+        user={user} 
+      />
     </div>
   );
 }

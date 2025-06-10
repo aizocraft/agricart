@@ -9,6 +9,7 @@ import Pagination from '../components/Pagination';
 import FilterSidebar from '../components/FilterSidebar';
 import { useDispatch, useSelector } from 'react-redux';
 import { addToCart } from '../store/cartSlice';
+import { useDocumentMetadata } from '../hooks/useDocumentMetadata';
 
 const categories = [
   'Fruits',
@@ -24,15 +25,15 @@ const categories = [
 ];
 
 const locations = [
-  'Nyeri, Kenya',
-  'Embu, Kenya',
-  'Kiambu, Kenya',
-  'Mombasa, Kenya',
-  'Nairobi, Kenya',
-  'Kisumu, Kenya',
-  'Eldoret, Kenya',
-  'Thika, Kenya',
-  'Nakuru, Kenya'
+  'Nyeri',
+  'Embu',
+  'Kiambu',
+  'Mombasa',
+  'Nairobi',
+  'Kisumu',
+  'Eldoret',
+  'Thika',
+  'Nakuru'
 ];
 
 const sortOptions = [
@@ -44,6 +45,10 @@ const sortOptions = [
 ];
 
 export default function Products() {
+    useDocumentMetadata({
+      title: 'Product Listing',
+      description: 'Browse various farm products by category, price, and location'
+    });
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -74,8 +79,8 @@ export default function Products() {
           page: currentPage,
           limit,
           search: keyword,
-          minPrice,
-          maxPrice,
+          minPrice: minPrice || undefined,
+          maxPrice: maxPrice || undefined,
           organic: organic || undefined,
           location: locationFilter || undefined,
           sort
@@ -147,14 +152,14 @@ export default function Products() {
   };
 
   const resetFilters = () => {
-    setSearchParams({});
+    setSearchParams({ page: '1' });
   };
 
   const activeFilters = [
     ...(keyword ? [`Search: "${keyword}"`] : []),
     ...(category ? [`Category: ${category}`] : []),
-    ...(minPrice ? [`Min Price: $${minPrice}`] : []),
-    ...(maxPrice ? [`Max Price: $${maxPrice}`] : []),
+    ...(minPrice ? [`Min Price: KSh${minPrice}`] : []),
+    ...(maxPrice ? [`Max Price: KSh${maxPrice}`] : []),
     ...(organic ? ['Organic Only'] : []),
     ...(locationFilter ? [`Location: ${locationFilter}`] : []),
     ...(sort !== 'newest' ? [`Sorted: ${sortOptions.find(o => o.value === sort)?.label}`] : [])

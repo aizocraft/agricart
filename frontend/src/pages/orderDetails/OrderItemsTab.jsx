@@ -26,7 +26,7 @@ export default function OrderItemsTab({ order, reviews }) {
                   {item.quantity || 0} × KES {item.price?.toFixed(2) || '0.00'}
                 </p>
                 {item.product?.organic && (
-                  <span className="inline-block mt-1 px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-800 rounded">
+                  <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded mt-1">
                     Organic
                   </span>
                 )}
