@@ -6,12 +6,11 @@
   },
   "description": "",
   "main": "server.js",
-  "type": "module",
-  "scripts": {
-    
-    "start": "node server.js",
-    "dev": "nodemon server.js"
-  },
+  "type": "module","scripts": {
+  "start": "node server.js",
+  "dev": "nodemon server.js",
+  "postinstall": "npm rebuild && npm dedupe"
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
