@@ -18,6 +18,7 @@ import productRoutes from './routes/productRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import { initiateMpesaPayment, mpesaCallbackHandler, checkPaymentStatus } from './controllers/paymentController.js';
 import userRoutes from './routes/userRoutes.js';
 
 // Middleware

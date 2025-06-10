@@ -195,7 +195,6 @@ export const orderAPI = {
     API.put(`/orders/${id}/deliver`),
   cancelOrder: (id, cancellationData = {}) => 
     API.put(`/orders/${id}/cancel`, cancellationData),
-
   // Real-time updates (for Socket.io)
   listenForOrderUpdates: (callback) => {
     socket.on("newOrder", callback);
@@ -214,14 +213,20 @@ export const adminAPI = {
   deleteUser: (id) => API.delete(`/admin/users/${id}`),
 };
 
+ 
 // Payment API
 export const paymentAPI = {
-  paypal: {
-    createPayment: (id, paymentData) => API.post(`/payment/paypal/${id}`, paymentData),
-  },
+  // M-Pesa Payment
   mpesa: {
-    createPayment: (id, paymentData) => API.post(`/payment/mpesa/${id}`, paymentData),
+    initiatePayment: (paymentData) => API.post('/payments/mpesa-stk-push', paymentData),
+    handleCallback: (callbackData) => API.post('/payments/mpesa-callback', callbackData),
+    checkStatus: (paymentId) => API.get(`/payments/status/${paymentId}`),
   },
+  
+  // PayPal Payment
+  paypal: {
+    createPayment: (orderId) => API.post(`/payment/paypal/${orderId}`),
+  }
 };
 
 export default API;

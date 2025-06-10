@@ -1,11 +1,17 @@
 // routes/paymentRoutes.js
 import express from 'express';
-import { processPayPalPayment, processMpesaPayment } from '../controllers/paymentController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, farmerOnly, adminOnly } from '../middleware/authMiddleware.js';
+import {
+  initiateMpesaPayment,
+  mpesaCallbackHandler,
+  checkPaymentStatus
+} from '../controllers/paymentController.js';
 
 const router = express.Router();
 
-router.post('/paypal/:id', protect, processPayPalPayment);
-router.post('/mpesa/:id', protect, processMpesaPayment);
+// M-Pesa payment routes
+router.post('/mpesa-stk-push', protect, initiateMpesaPayment);
+router.post('/mpesa-callback', mpesaCallbackHandler);
+router.get('/status/:paymentId', protect, checkPaymentStatus);
 
 export default router;

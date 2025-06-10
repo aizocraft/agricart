@@ -1,9 +1,8 @@
-// pages/Cart.jsx
 import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { 
-  removeFromCart, 
-  clearCart, 
+import {
+  removeFromCart,
+  clearCart,
   updateQuantity,
   saveShippingAddress,
   savePaymentMethod,
@@ -12,16 +11,12 @@ import {
   selectShippingAddress,
   selectPaymentMethod
 } from '../store/cartSlice';
-import { orderAPI } from '../services/api';
+import { orderAPI, paymentAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoadingSpinner from '../components/LoadingSpinner';
-import CartItems from './cart/CartItems';
-import OrderSummary from './cart/OrderSummary';
-import AddressForm from './cart/AddressForm';
-import PaymentMethod from "./cart/PaymentMethod";
 
 export default function Cart() {
   const cartItems = useSelector(selectCartItems);
@@ -31,10 +26,16 @@ export default function Cart() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [showPaymentMethod, setShowPaymentMethod] = useState(false);
+  const [showMpesaForm, setShowMpesaForm] = useState(false);
+  const [mpesaPhone, setMpesaPhone] = useState('');
+  const [isProcessingMpesa, setIsProcessingMpesa] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState(null);
+  const [activeOrderId, setActiveOrderId] = useState(null);
+  
   const [address, setAddress] = useState(savedShippingAddress || {
     address: '',
     city: '',
@@ -78,7 +79,7 @@ export default function Cart() {
     }
 
     if (!validatePhoneNumber(address.phone)) {
-      toast.error('Please enter a valid Kenyan phone number (e.g. 0712345678)');
+      toast.error('Please enter a valid Kenyan phone number (e.g. 0712345678 or 254712345678)');
       return;
     }
 
@@ -90,7 +91,88 @@ export default function Cart() {
   const savePaymentSelection = () => {
     dispatch(savePaymentMethod(paymentMethod));
     setShowPaymentMethod(false);
+    
+    if (paymentMethod === 'Mpesa') {
+      setShowMpesaForm(true);
+    }
+    
     toast.success('Payment method saved');
+  };
+
+  const handleMpesaPayment = async () => {
+    if (!validatePhoneNumber(mpesaPhone)) {
+      toast.error('Please enter a valid Kenyan phone number (e.g. 0712345678 or 254712345678)');
+      return;
+    }
+
+    setIsProcessingMpesa(true);
+    try {
+      const orderData = {
+        orderItems: cartItems.map(item => ({
+          product: item.product,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          image: item.image,
+          unit: item.unit
+        })),
+        shippingAddress: savedShippingAddress || address,
+        paymentMethod: 'Mpesa',
+        itemsPrice: subtotal,
+        taxPrice: tax,
+        shippingPrice: shipping,
+        totalPrice: total
+      };
+
+      // Create order first
+      const { data: order } = await orderAPI.createOrder(orderData);
+      setActiveOrderId(order._id);
+
+      // Initiate M-Pesa payment
+      const { data: payment } = await paymentAPI.mpesa.initiatePayment({
+        orderId: order._id,
+        phoneNumber: mpesaPhone.startsWith('0') ? `254${mpesaPhone.substring(1)}` : mpesaPhone
+      });
+
+      // Start polling for payment status
+      const checkPaymentStatus = async () => {
+        try {
+          const { data: status } = await paymentAPI.checkPaymentStatus(payment._id);
+          
+          if (status.payment.status === 'successful') {
+            setPaymentStatus('success');
+            dispatch(clearCart());
+            toast.success('Payment successful!');
+            navigate(`/order/${order._id}`, {
+              state: {
+                order: order,
+                justCreated: true
+              }
+            });
+          } else if (status.payment.status === 'failed') {
+            setPaymentStatus('failed');
+            toast.error('Payment failed. Please try again.');
+          } else {
+            // Continue polling if still pending
+            setTimeout(checkPaymentStatus, 3000);
+          }
+        } catch (error) {
+          console.error('Payment status check error:', error);
+          setTimeout(checkPaymentStatus, 3000);
+        }
+      };
+
+      checkPaymentStatus();
+    } catch (error) {
+      console.error('M-Pesa payment error:', error);
+      const errorMsg = error.response?.data?.message ||
+        error.message ||
+        'M-Pesa payment failed. Please try again.';
+      toast.error(errorMsg);
+      setPaymentStatus('failed');
+    } finally {
+      setIsProcessingMpesa(false);
+    }
   };
 
   const handleCheckout = async () => {
@@ -112,55 +194,65 @@ export default function Cart() {
       return;
     }
 
-    setIsCheckingOut(true);
-    try {
-      const orderData = {
-        orderItems: cartItems.map(item => ({
-          product: item.product,
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price,
-          image: item.image,
-          unit: item.unit
-        })),
-        shippingAddress: savedShippingAddress || address,
-        paymentMethod: savedPaymentMethod || paymentMethod,
-        itemsPrice: subtotal,
-        taxPrice: tax,
-        shippingPrice: shipping,
-        totalPrice: total
-      };
+    // If M-Pesa is selected but form not shown
+    if ((savedPaymentMethod === 'Mpesa' || paymentMethod === 'Mpesa') && !showMpesaForm) {
+      setShowMpesaForm(true);
+      return;
+    }
 
-      const { data } = await orderAPI.createOrder(orderData);
-      dispatch(clearCart());
-      toast.success('Order placed successfully!');
-      navigate(`/order/${data._id}`, { 
-        state: { 
-          order: data,
-          justCreated: true 
-        } 
-      });
-    } catch (error) {
-      console.error('Checkout error:', error);
-      const errorMsg = error.response?.data?.message || 
-        error.message || 
-        'Checkout failed. Please try again.';
-      
-      if (error.response?.data?.outOfStockItems) {
-        toast.error(
-          `Some items are out of stock. Please update your cart.`,
-          { duration: 5000 }
-        );
-        error.response.data.outOfStockItems.forEach(item => {
-          dispatch(removeFromCart(item.product));
+    // For non-M-Pesa payments
+    if (paymentMethod !== 'Mpesa' && savedPaymentMethod !== 'Mpesa') {
+      setIsCheckingOut(true);
+      try {
+        const orderData = {
+          orderItems: cartItems.map(item => ({
+            product: item.product,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            image: item.image,
+            unit: item.unit
+          })),
+          shippingAddress: savedShippingAddress || address,
+          paymentMethod: savedPaymentMethod || paymentMethod,
+          itemsPrice: subtotal,
+          taxPrice: tax,
+          shippingPrice: shipping,
+          totalPrice: total
+        };
+
+        const { data } = await orderAPI.createOrder(orderData);
+        dispatch(clearCart());
+        toast.success('Order placed successfully!');
+
+        navigate(`/order/${data._id}`, {
+          state: {
+            order: data,
+            justCreated: true
+          }
         });
-      } else if (error.response?.status === 400 && error.response.data?.message?.includes('stock')) {
-        toast.error('Some items in your cart are no longer available in the requested quantities. Please update your cart.');
-      } else {
-        toast.error(errorMsg);
+      } catch (error) {
+        console.error('Checkout error:', error);
+        const errorMsg = error.response?.data?.message ||
+          error.message ||
+          'Checkout failed. Please try again.';
+
+        if (error.response?.data?.outOfStockItems) {
+          toast.error(
+            `Some items are out of stock. Please update your cart.`,
+            { duration: 5000 }
+          );
+          error.response.data.outOfStockItems.forEach(item => {
+            dispatch(removeFromCart(item.product));
+          });
+        } else if (error.response?.status === 400 && error.response.data?.message?.includes('stock')) {
+          toast.error('Some items in your cart are no longer available in the requested quantities. Please update your cart.');
+        } else {
+          toast.error(errorMsg);
+        }
+      } finally {
+        setIsCheckingOut(false);
       }
-    } finally {
-      setIsCheckingOut(false);
     }
   };
 
@@ -172,7 +264,7 @@ export default function Cart() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <motion.h1 
+      <motion.h1
         className="text-3xl font-bold mb-8 text-gray-800"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -180,7 +272,7 @@ export default function Cart() {
       >
         Your Shopping Cart
       </motion.h1>
-      
+
       <AnimatePresence>
         {cartItems.length === 0 ? (
           <motion.div
@@ -190,21 +282,21 @@ export default function Cart() {
             exit={{ opacity: 0 }}
           >
             <div className="inline-flex flex-col items-center">
-              <svg 
-                className="w-16 h-16 text-gray-400 mb-4" 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                className="w-16 h-16 text-gray-400 mb-4"
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth="2" 
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
                   d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707V20a2 2 0 002 2h10a2 2 0 002-2v-4.414c0-1.074.336-2.077.707-2.293L17 13m-5-5a2 2 0 11-4 0a2 2 0 014 0z"
                 />
               </svg>
               <p className="text-lg text-gray-600 mb-6">Your cart is empty</p>
-              <motion.button 
+              <motion.button
                 onClick={() => navigate('/products')}
                 className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors shadow-md"
                 whileHover={{ scale: 1.05 }}
@@ -215,51 +307,401 @@ export default function Cart() {
             </div>
           </motion.div>
         ) : (
-          <motion.div 
+          <motion.div
             className="grid grid-cols-1 lg:grid-cols-3 gap-8"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ staggerChildren: 0.1 }}
           >
             <div className="lg:col-span-2 space-y-6">
+              {/* Shipping Address Section */}
               {showAddressForm && (
-                <AddressForm 
-                  address={address}
-                  onAddressChange={handleAddressChange}
-                  onSave={saveAddress}
-                  onCancel={() => setShowAddressForm(false)}
-                />
+                <motion.div
+                  className="bg-white rounded-xl shadow-sm p-6"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <h3 className="text-lg font-semibold mb-4">Shipping Address</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number*</label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={address.phone}
+                        onChange={handleAddressChange}
+                        className="w-full px-3 py-2 border rounded-md"
+                        required
+                        placeholder="e.g. 0712345678"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                      <select
+                        name="country"
+                        value={address.country}
+                        onChange={handleAddressChange}
+                        className="w-full px-3 py-2 border rounded-md"
+                      >
+                        <option value="Kenya">Kenya</option>
+                        <option value="Uganda">Uganda</option>
+                        <option value="Tanzania">Tanzania</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Address*</label>
+                      <input
+                        type="text"
+                        name="address"
+                        value={address.address}
+                        onChange={handleAddressChange}
+                        className="w-full px-3 py-2 border rounded-md"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">City*</label>
+                      <input
+                        type="text"
+                        name="city"
+                        value={address.city}
+                        onChange={handleAddressChange}
+                        className="w-full px-3 py-2 border rounded-md"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code*</label>
+                      <input
+                        type="text"
+                        name="postalCode"
+                        value={address.postalCode}
+                        onChange={handleAddressChange}
+                        className="w-full px-3 py-2 border rounded-md"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end mt-4 space-x-3">
+                    <button
+                      onClick={() => setShowAddressForm(false)}
+                      className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveAddress}
+                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                    >
+                      Save Address
+                    </button>
+                  </div>
+                </motion.div>
               )}
 
+              {/* Payment Method Section */}
               {showPaymentMethod && (
-                <PaymentMethod 
-                  paymentMethod={paymentMethod}
-                  setPaymentMethod={setPaymentMethod}
-                  onSave={savePaymentSelection}
-                  onCancel={() => setShowPaymentMethod(false)}
-                />
+                <motion.div
+                  className="bg-white rounded-xl shadow-sm p-6"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <h3 className="text-lg font-semibold mb-4">Select Payment Method</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="mpesa"
+                        name="paymentMethod"
+                        value="Mpesa"
+                        checked={paymentMethod === 'Mpesa'}
+                        onChange={() => setPaymentMethod('Mpesa')}
+                        className="h-4 w-4 text-green-600 focus:ring-green-500"
+                      />
+                      <label htmlFor="mpesa" className="ml-3 block text-sm font-medium text-gray-700">
+                        M-Pesa
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="paypal"
+                        name="paymentMethod"
+                        value="PayPal"
+                        checked={paymentMethod === 'PayPal'}
+                        onChange={() => setPaymentMethod('PayPal')}
+                        className="h-4 w-4 text-green-600 focus:ring-green-500"
+                      />
+                      <label htmlFor="paypal" className="ml-3 block text-sm font-medium text-gray-700">
+                        PayPal
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        id="cod"
+                        name="paymentMethod"
+                        value="Cash on Delivery"
+                        checked={paymentMethod === 'Cash on Delivery'}
+                        onChange={() => setPaymentMethod('Cash on Delivery')}
+                        className="h-4 w-4 text-green-600 focus:ring-green-500"
+                      />
+                      <label htmlFor="cod" className="ml-3 block text-sm font-medium text-gray-700">
+                        Cash on Delivery
+                      </label>
+                    </div>
+                  </div>
+                  <div className="flex justify-end mt-4 space-x-3">
+                    <button
+                      onClick={() => setShowPaymentMethod(false)}
+                      className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={savePaymentSelection}
+                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                    >
+                      Save Payment Method
+                    </button>
+                  </div>
+                </motion.div>
               )}
 
-              <CartItems 
-                items={cartItems}
-                onRemove={(productId) => dispatch(removeFromCart(productId))}
-                onQuantityChange={handleQuantityChange}
-              />
+              {/* M-Pesa Payment Form */}
+              {showMpesaForm && (
+                <motion.div
+                  className="bg-white rounded-xl shadow-sm p-6"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <h3 className="text-lg font-semibold mb-4">M-Pesa Payment</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm text-gray-600 mb-2">
+                        You will receive an M-Pesa push notification to complete payment.
+                        Please ensure your phone is nearby and has sufficient funds.
+                      </p>
+                      <p className="text-sm font-medium text-gray-700 mb-1">
+                        Total Amount: <span className="text-green-600">KES {total.toFixed(2)}</span>
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        M-Pesa Phone Number*
+                      </label>
+                      <input
+                        type="tel"
+                        value={mpesaPhone}
+                        onChange={(e) => setMpesaPhone(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-md"
+                        placeholder="e.g. 0712345678 or 254712345678"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Enter the phone number registered with M-Pesa
+                      </p>
+                    </div>
+
+                    {paymentStatus === 'failed' && (
+                      <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">
+                        Payment failed. Please try again or use a different payment method.
+                      </div>
+                    )}
+
+                    <div className="flex justify-end space-x-3 mt-4">
+                      <button
+                        onClick={() => {
+                          setShowMpesaForm(false);
+                          setPaymentStatus(null);
+                        }}
+                        className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleMpesaPayment}
+                        disabled={isProcessingMpesa}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center justify-center min-w-32"
+                      >
+                        {isProcessingMpesa ? (
+                          <>
+                            <LoadingSpinner className="w-5 h-5 mr-2" />
+                            Processing...
+                          </>
+                        ) : (
+                          'Pay with M-Pesa'
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Cart Items Section */}
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <AnimatePresence>
+                  {cartItems.map(item => (
+                    <motion.div
+                      key={item.product}
+                      className="p-4 border-b flex flex-col sm:flex-row"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                      transition={{ duration: 0.2 }}
+                      layout
+                    >
+                      <div className="flex-shrink-0">
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-20 h-20 object-cover rounded-lg"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="mt-4 sm:mt-0 sm:ml-4 flex-grow">
+                        <div className="flex justify-between">
+                          <div>
+                            <h3 className="font-semibold text-gray-800">{item.name}</h3>
+                            <p className="text-sm text-gray-500">
+                              {item.unit && `${item.quantity} ${item.unit}`}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => dispatch(removeFromCart(item.product))}
+                            className="text-red-500 hover:text-red-700 transition-colors h-6"
+                            aria-label="Remove item"
+                          >
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between mt-3">
+                          <div className="flex items-center border rounded-md overflow-hidden">
+                            <button
+                              onClick={() => handleQuantityChange(item.product, item.quantity - 1)}
+                              className="px-3 py-1 bg-gray-100 hover:bg-gray-200 transition-colors"
+                              aria-label="Decrease quantity"
+                              disabled={item.quantity <= 1}
+                            >
+                              -
+                            </button>
+                            <span className="px-4 py-1 text-center w-12">
+                              {item.quantity}
+                            </span>
+                            <button
+                              onClick={() => handleQuantityChange(item.product, item.quantity + 1)}
+                              className="px-3 py-1 bg-gray-100 hover:bg-gray-200 transition-colors"
+                              aria-label="Increase quantity"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <span className="text-gray-700 font-medium">
+                            KES {(item.price * item.quantity).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
             </div>
-            
-            <OrderSummary 
-              subtotal={subtotal}
-              tax={tax}
-              shipping={shipping}
-              total={total}
-              savedShippingAddress={savedShippingAddress}
-              savedPaymentMethod={savedPaymentMethod}
-              onAddressEdit={() => setShowAddressForm(true)}
-              onPaymentEdit={() => setShowPaymentMethod(true)}
-              onCheckout={handleCheckout}
-              isCheckingOut={isCheckingOut}
-              onContinueShopping={() => navigate('/products')}
-            />
+
+            {/* Order Summary Section */}
+            <div className="bg-white rounded-xl shadow-sm p-6 h-fit sticky top-4">
+              <h2 className="text-xl font-semibold text-gray-800 mb-6">Order Summary</h2>
+              <div className="space-y-3 mb-6">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Subtotal</span>
+                  <span className="font-medium">KES {subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Tax (10%)</span>
+                  <span className="font-medium">KES {tax.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Shipping</span>
+                  <span className="font-medium">
+                    {shipping === 0 ? 'Free' : `KES ${shipping.toFixed(2)}`}
+                  </span>
+                </div>
+                <div className="border-t pt-3 flex justify-between text-lg font-bold text-gray-800">
+                  <span>Total</span>
+                  <span>KES {total.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {savedShippingAddress && (
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="text-sm font-medium text-gray-600 mb-2">Shipping to</h3>
+                  <p className="text-gray-800">
+                    {savedShippingAddress.address}, {savedShippingAddress.city}<br />
+                    {savedShippingAddress.postalCode}, {savedShippingAddress.country}<br />
+                    Phone: {savedShippingAddress.phone}
+                  </p>
+                  <button
+                    onClick={() => setShowAddressForm(true)}
+                    className="mt-2 text-sm text-green-600 hover:underline"
+                  >
+                    Change address
+                  </button>
+                </div>
+              )}
+
+              {savedPaymentMethod && (
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="text-sm font-medium text-gray-600 mb-2">Payment Method</h3>
+                  <p className="text-gray-800 capitalize">{savedPaymentMethod.toLowerCase()}</p>
+                  <button
+                    onClick={() => {
+                      setShowPaymentMethod(true);
+                      setShowMpesaForm(false);
+                    }}
+                    className="mt-2 text-sm text-green-600 hover:underline"
+                  >
+                    Change payment
+                  </button>
+                </div>
+              )}
+
+              {(!showMpesaForm && (savedPaymentMethod !== 'Mpesa' || paymentMethod !== 'Mpesa')) && (
+                <motion.button
+                  onClick={handleCheckout}
+                  className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors shadow-md flex justify-center items-center"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  disabled={cartItems.length === 0 || isCheckingOut}
+                >
+                  {isCheckingOut ? (
+                    <>
+                      <LoadingSpinner className="w-5 h-5 mr-2" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Proceed to Checkout'
+                  )}
+                </motion.button>
+              )}
+
+              <button
+                onClick={() => navigate('/products')}
+                className="w-full mt-4 text-green-600 py-2.5 rounded-lg border border-green-600 hover:bg-green-50 transition-colors"
+              >
+                Continue Shopping
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

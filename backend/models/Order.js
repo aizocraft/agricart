@@ -83,7 +83,7 @@ const orderSchema = new mongoose.Schema({
     type: String, 
     required: [true, 'Payment method is required'],
     enum: {
-      values: ['Credit Card', 'PayPal', 'Bank Transfer', 'Cash on Delivery'],
+      values: ['Credit Card', 'PayPal', 'Bank Transfer', 'Cash on Delivery', 'Mpesa'],
       message: '{VALUE} is not a valid payment method'
     }
   },

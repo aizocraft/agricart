@@ -265,6 +265,7 @@ const getFarmerOrders = async (req, res) => {
     });
   }
 };
+ 
 
 // @desc    Update order to paid
 // @route   PUT /api/orders/:id/pay
@@ -330,39 +331,99 @@ const updateOrderToPaid = async (req, res) => {
       });
     }
 
-    // Update inventory
-    await Promise.all(order.orderItems.map(async (item) => {
-      const product = await Product.findById(item.product).session(session);
-      product.stock -= item.quantity;
-      await product.save({ session });
-      
-      // Notify farmer
-      if (req.io && product.farmer) {
-        req.io.to(product.farmer.toString()).emit('newOrder', {
-          orderId: order._id,
-          productId: product._id,
-          quantity: item.quantity,
-          buyerName: req.user.name
-        });
-      }
-    }));
+    // Handle different payment methods
+    switch (order.paymentMethod) {
+      case 'M-Pesa':
+        // For M-Pesa, verify the payment record exists and is successful
+        const payment = await Payment.findOne({
+          order: order._id,
+          status: 'successful'
+        }).session(session);
+
+        if (!payment) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({ 
+            success: false,
+            message: 'No successful M-Pesa payment found for this order' 
+          });
+        }
+
+        // Use M-Pesa payment details
+        order.paymentResult = {
+          id: payment.mpesaTransaction.mpesaReceiptNumber,
+          status: 'completed',
+          update_time: payment.mpesaTransaction.transactionDate,
+          phone: payment.mpesaTransaction.phoneNumber
+        };
+        break;
+
+      case 'Cash on Delivery':
+        // For COD, just mark as paid without payment verification
+        order.paymentResult = {
+          status: 'completed',
+          update_time: new Date().toISOString(),
+          phone: req.user.phone
+        };
+        break;
+
+      default:
+        // For other payment methods (Credit Card, PayPal, Bank Transfer)
+        if (!req.body.id || !req.body.status) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({ 
+            success: false,
+            message: 'Payment verification details are required for this payment method' 
+          });
+        }
+
+        order.paymentResult = {
+          id: req.body.id,
+          status: req.body.status,
+          update_time: req.body.update_time || new Date().toISOString(),
+          email_address: req.body.payer?.email_address,
+          phone: req.body.payer?.phone_number || req.user.phone
+        };
+    }
+
+    // Update inventory only if not already updated (for M-Pesa it's done in callback)
+    if (!order.inventoryUpdated) {
+      await Promise.all(order.orderItems.map(async (item) => {
+        const product = await Product.findById(item.product).session(session);
+        product.stock -= item.quantity;
+        await product.save({ session });
+        
+        // Notify farmer
+        if (req.io && product.farmer) {
+          req.io.to(product.farmer.toString()).emit('newOrder', {
+            orderId: order._id,
+            productId: product._id,
+            quantity: item.quantity,
+            buyerName: req.user.name
+          });
+        }
+      }));
+    }
 
     // Update order status
     order.isPaid = true;
     order.paidAt = Date.now();
     order.status = 'Processing';
     order.inventoryUpdated = true;
-    order.paymentResult = {
-      id: req.body.id,
-      status: req.body.status,
-      update_time: req.body.update_time,
-      email_address: req.body.payer?.email_address,
-      phone: req.body.payer?.phone_number || req.user.phone
-    };
 
     const updatedOrder = await order.save({ session });
     await session.commitTransaction();
     session.endSession();
+
+    // Notify user about successful payment
+    if (req.io) {
+      req.io.to(order.user.toString()).emit('orderPaid', {
+        orderId: order._id,
+        paidAt: order.paidAt,
+        paymentMethod: order.paymentMethod
+      });
+    }
 
     res.json({
       success: true,
@@ -382,6 +443,8 @@ const updateOrderToPaid = async (req, res) => {
     });
   }
 };
+
+
 
 // @desc    Update order to delivered
 // @route   PUT /api/orders/:id/deliver
