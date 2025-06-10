@@ -39,10 +39,7 @@
 <br>
 
 ## 🚀 **Under Construction...** 🚀  
-### **🛠️ Expected Completion Date: 📅 End of This Week**  
-
-### **Progress:**  
-![Progress](https://progress-bar.dev/50/?title=Development%20Progress&width=400)  
+ 
 
 <br>
 
