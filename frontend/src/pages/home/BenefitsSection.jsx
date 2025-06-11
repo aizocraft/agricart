@@ -1,68 +1,71 @@
-import { motion } from 'framer-motion';
-import { FaLeaf } from 'react-icons/fa';
-import { GiFarmer } from 'react-icons/gi';
-import { TbTractor } from 'react-icons/tb';
+import { motion } from "framer-motion";
+import { FaLeaf } from "react-icons/fa";
+import { GiFarmer } from "react-icons/gi";
+import { TbTractor } from "react-icons/tb";
 
 export default function BenefitsSection({ currentTheme }) {
-  return (
-    <section className={`py-16 ${currentTheme.bg}`}>
-      <div className="container mx-auto px-4">
-        <div className={`rounded-3xl p-8 md:p-12 text-white overflow-hidden relative ${currentTheme.primary}`}>
-          <div className="absolute inset-0 opacity-10 bg-[url('https://images.unsplash.com/photo-1605000797499-95a51c5269ae?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1471&q=80')] bg-cover bg-center"></div>
-          <div className="relative z-10">
-            <motion.div 
-              className="text-center mb-12"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                Why Choose <span className="text-yellow-300">Agricart</span>
-              </h2>
-              <p className="text-green-100 max-w-2xl mx-auto text-lg">
-                Supporting Kenya's agricultural heritage while bringing you the freshest produce
-              </p>
-            </motion.div>
+  const bgClass = currentTheme?.bg || "bg-gray-50";
+const textPrimary = "text-gray-900";
+const accent = "text-green-600";
+const cardBg = "bg-white";
+const cardBorder = "border-gray-200";
+const goldColor = currentTheme?.gold || "text-yellow-500";
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {[
-                {
-                  title: "Support Kenyan Farmers",
-                  description: "Your purchase directly supports Kenyan farming families",
-                  icon: <GiFarmer className="text-4xl" />
-                },
-                {
-                  title: "Fresh from Kenyan Soil",
-                  description: "Produce harvested at peak freshness from Kenyan farms",
-                  icon: <TbTractor className="text-4xl" />
-                },
-                {
-                  title: "Sustainable Practices",
-                  description: "Eco-friendly farming that preserves Kenya's land",
-                  icon: <FaLeaf className="text-4xl" />
-                }
-              ].map((benefit, index) => (
-                <motion.div
-                  key={benefit.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 * index }}
-                  whileHover={{ 
-                    y: -5,
-                    scale: 1.02,
-                    transition: { duration: 0.3 }
-                  }}
-                  className="bg-white/10 backdrop-blur-sm p-6 rounded-2xl border border-white/20"
-                >
-                  <div className="flex justify-center mb-4 text-yellow-300">
-                    {benefit.icon}
-                  </div>
-                  <h3 className="text-xl font-bold mb-2 text-center">{benefit.title}</h3>
-                  <p className="text-green-100 text-center">{benefit.description}</p>
-                </motion.div>
-              ))}
-            </div>
-          </div>
+  const benefits = [
+    {
+      title: "Empowering Local Farmers",
+      description:
+        "Every order helps uplift Kenyan farmers by providing fair income and stable livelihoods.",
+      icon: <GiFarmer className="w-10 h-10" />,
+    },
+    {
+      title: "Farm-to-Table Freshness",
+      description:
+        "Handpicked produce delivered quickly to retain maximum nutrition and flavor.",
+      icon: <TbTractor className="w-10 h-10" />,
+    },
+    {
+      title: "Sustainable & Eco-Friendly",
+      description:
+        "Committed to green farming methods that protect and nourish Kenya’s land.",
+      icon: <FaLeaf className="w-10 h-10" />,
+    },
+  ];
+
+  return (
+    <section className={`${bgClass} py-20`}>
+      <div className="max-w-7xl mx-auto px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7 }}
+          className="max-w-3xl mx-auto text-center mb-16"
+        >
+          <h2 className={`text-4xl font-extrabold tracking-tight ${goldColor} mb-4`}>
+            Why <span className={`${accent}`}>Choose Agricart</span> ?
+          </h2>
+          <p className="text-lg text-gray-700 max-w-xl mx-auto">
+            Proudly supporting Kenyan farmers while bringing you fresh, healthy,
+            and sustainable produce — directly from the farm to your table.
+          </p>
+        </motion.div>
+
+        <div className="grid gap-12 sm:grid-cols-2 md:grid-cols-3">
+          {benefits.map(({ title, description, icon }, idx) => (
+            <motion.div
+              key={title}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ delay: idx * 0.2, duration: 0.5 }}
+              whileHover={{ scale: 1.05, y: -10, boxShadow: "0 10px 20px rgba(72, 187, 120, 0.3)" }}
+              className={`${cardBg} border ${cardBorder} rounded-3xl p-8 flex flex-col items-center text-center shadow-md cursor-pointer`}
+            >
+              <div className={`mb-6 ${accent}`}>{icon}</div>
+              <h3 className={`text-xl font-semibold mb-3 ${textPrimary}`}>{title}</h3>
+              <p className="text-gray-600">{description}</p>
+            </motion.div>
+          ))}
         </div>
       </div>
     </section>

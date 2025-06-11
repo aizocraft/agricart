@@ -118,6 +118,14 @@ export default function Navbar() {
             <NavLink to="/products" darkMode={darkMode}>
               Products
             </NavLink>
+
+            <NavLink to="/about" darkMode={darkMode}>
+              About Us
+            </NavLink>
+
+            <NavLink to="/contact" darkMode={darkMode}>
+              Contact
+            </NavLink>
             
             {isAuthenticated && (
               <NavLink to="/orders" darkMode={darkMode}>
@@ -297,6 +305,14 @@ export default function Navbar() {
             >
               <MobileLink to="/products" onClick={toggleMobileMenu} darkMode={darkMode}>
                 Products
+              </MobileLink>
+
+               <MobileLink to="/about" onClick={toggleMobileMenu} darkMode={darkMode}>
+                About Us
+              </MobileLink>
+
+              <MobileLink to="/contact" onClick={toggleMobileMenu} darkMode={darkMode}>
+                Contact 
               </MobileLink>
               
               {isAuthenticated && (

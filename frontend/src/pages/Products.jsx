@@ -109,7 +109,7 @@ export default function Products() {
   const handleAddToCart = (product) => {
     if (!user) {
       toast.error('Please login to add items to cart');
-      navigate('/auth/login');
+      navigate('/login');
       return;
     }
 

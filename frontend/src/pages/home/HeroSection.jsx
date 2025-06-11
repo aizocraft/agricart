@@ -3,6 +3,9 @@ import { motion, useAnimation } from 'framer-motion';
 import { GiFruitBowl, GiFarmer, GiShoppingCart } from 'react-icons/gi';
 import { useInView } from 'react-intersection-observer';
 import { useEffect } from 'react';
+import person1 from "../../assets/person1.png";
+import person2 from "../../assets/person2.png";
+import person3 from "../../assets/person3.png";
 
 export default function HeroSection({ user, currentTheme }) {
   const controls = useAnimation();
@@ -151,7 +154,7 @@ export default function HeroSection({ user, currentTheme }) {
               variants={itemVariants}
               className="flex items-center gap-4"
             >
-              <div className="w-16 h-16 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center p-2 shadow-lg">
+              <div className="w-20 h-20 md:w-32 md:h-32 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center p-2 shadow-lg">
                 <img 
                   src="/logo.png" 
                   alt="Agricart Logo" 
@@ -278,9 +281,8 @@ export default function HeroSection({ user, currentTheme }) {
           }}
         >
           <motion.img
-            src="https://images.unsplash.com/photo-1605000797499-95a51c5269ae?auto=format&fit=crop&w=1471&q=80"
-            alt="Kenyan produce"
-            className="object-cover w-full h-full"
+src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1470&q=80"  
+        className="object-cover w-full h-full"
             initial={{ scale: 1.1 }}
             animate={{ 
               scale: 1,
@@ -319,20 +321,20 @@ export default function HeroSection({ user, currentTheme }) {
                 }
               }}
             >
-              <div className="flex -space-x-2">
-                {[22, 23, 24].map((id) => (
-                  <motion.img
-                    key={id}
-                    src={`https://randomuser.me/api/portraits/women/${id}.jpg`}
-                    className="w-7 h-7 md:w-8 md:h-8 rounded-full border-2 border-white"
-                    alt="Happy customer"
-                    whileHover={{ 
-                      y: -4,
-                      transition: { duration: 0.2 }
-                    }}
-                  />
-                ))}
-              </div>
+<div className="flex -space-x-2">
+  {[person1, person2, person3].map((image, index) => (
+    <motion.img
+      key={`customer-${index}`}
+      src={image}
+      className="w-7 h-7 md:w-8 md:h-8 rounded-full border-2 border-white object-cover"
+      alt="Happy customer"
+      whileHover={{ 
+        y: -4,
+        transition: { duration: 0.2 }
+      }}
+    />
+  ))}
+</div>
               <span className="ml-3 text-xs md:text-sm">Trusted by 5000+ customers</span>
             </motion.div>
           </div>

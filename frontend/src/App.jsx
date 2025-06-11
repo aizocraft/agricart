@@ -1,5 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
+import About from './pages/About';
+import Contact from './pages/Contact';
 import Products from './pages/Products';
 import Cart from './pages/Cart';
 import Orders from './pages/Orders';
@@ -15,7 +17,9 @@ import ProductForm from './pages/farmer/ProductForm';
 import ProtectedRoute from './components/ProtectedRoute';
 import NotFound from './pages/NotFound';
 import { Toaster } from 'react-hot-toast';
-
+import Shipping from './pages/footer/Shipping';
+import Faq from './pages/footer/Faq';
+import Returns from './pages/footer/Returns';
 function App() {
   return (
     <div className="flex flex-col min-h-screen">
@@ -24,6 +28,8 @@ function App() {
         <Toaster position="top-center" />
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
           <Route path="/products" element={<Products />} />
           <Route path="/products/:id" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
@@ -31,7 +37,9 @@ function App() {
           <Route path="/orders/:id" element={<OrderDetails />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          
+          <Route path="/shipping" element={<Shipping />} />
+          <Route path="/faq" element={<Faq />} />
+          <Route path="/returns" element={<Returns />} />
           <Route 
             path="/farmer/dashboard" 
             element={
